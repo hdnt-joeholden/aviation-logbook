@@ -18,12 +18,15 @@ export default function AviationLogbook() {
   const [ataChapters, setAtaChapters] = useState([]);
   const [profile, setProfile] = useState(null);
   const [addresses, setAddresses] = useState([]);
+  const [employmentHistory, setEmploymentHistory] = useState([]);
   const [showEntryModal, setShowEntryModal] = useState(false);
   const [showSupervisorModal, setShowSupervisorModal] = useState(false);
   const [showAddressModal, setShowAddressModal] = useState(false);
+  const [showEmploymentModal, setShowEmploymentModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
   const [editingSupervisor, setEditingSupervisor] = useState(null);
   const [editingAddress, setEditingAddress] = useState(null);
+  const [editingEmployment, setEditingEmployment] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
@@ -64,6 +67,16 @@ export default function AviationLogbook() {
     county: '',
     postcode: '',
     country: 'United Kingdom',
+    from_date: '',
+    to_date: '',
+    is_current: false
+  });
+
+  const [employmentFormData, setEmploymentFormData] = useState({
+    company_name: '',
+    company_approval_number: '',
+    position: '',
+    duties: '',
     from_date: '',
     to_date: '',
     is_current: false
@@ -148,6 +161,14 @@ export default function AviationLogbook() {
       if (addressesError) throw addressesError;
       setAddresses(addressesData || []);
 
+      const { data: employmentData, error: employmentError } = await supabase
+        .from('employment_history')
+        .select('*')
+        .order('from_date', { ascending: false });
+      
+      if (employmentError) throw employmentError;
+      setEmploymentHistory(employmentData || []);
+
     } catch (err) {
       console.error('Error loading data:', err);
       setError('Failed to load data');
@@ -202,6 +223,7 @@ export default function AviationLogbook() {
     setSupervisors([]);
     setProfile(null);
     setAddresses([]);
+    setEmploymentHistory([]);
     setCurrentView('logbook');
   };
 
@@ -339,6 +361,107 @@ export default function AviationLogbook() {
     }
   };
 
+  const openEmploymentModal = (employment = null) => {
+    if (employment) {
+      setEditingEmployment(employment);
+      setEmploymentFormData({
+        company_name: employment.company_name,
+        company_approval_number: employment.company_approval_number || '',
+        position: employment.position,
+        duties: employment.duties || '',
+        from_date: employment.from_date,
+        to_date: employment.to_date || '',
+        is_current: employment.is_current
+      });
+    } else {
+      setEditingEmployment(null);
+      setEmploymentFormData({
+        company_name: '',
+        company_approval_number: '',
+        position: '',
+        duties: '',
+        from_date: '',
+        to_date: '',
+        is_current: false
+      });
+    }
+    setShowEmploymentModal(true);
+  };
+
+  const closeEmploymentModal = () => {
+    setShowEmploymentModal(false);
+    setEditingEmployment(null);
+    setError('');
+  };
+
+  const handleSubmitEmployment = async () => {
+    try {
+      if (!employmentFormData.company_name || !employmentFormData.position || !employmentFormData.from_date) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      setError('');
+      setLoading(true);
+
+      if (employmentFormData.is_current) {
+        await supabase
+          .from('employment_history')
+          .update({ is_current: false })
+          .neq('id', editingEmployment?.id || '00000000-0000-0000-0000-000000000000');
+      }
+
+      const employmentData = {
+        ...employmentFormData,
+        user_id: user.id,
+        to_date: employmentFormData.to_date || null
+      };
+
+      if (editingEmployment) {
+        const { error } = await supabase
+          .from('employment_history')
+          .update(employmentData)
+          .eq('id', editingEmployment.id);
+        
+        if (error) throw error;
+        setSuccess('Employment record updated successfully!');
+      } else {
+        const { error } = await supabase
+          .from('employment_history')
+          .insert([employmentData]);
+        
+        if (error) throw error;
+        setSuccess('Employment record added successfully!');
+      }
+
+      await loadUserData();
+      closeEmploymentModal();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteEmployment = async (id) => {
+    if (!confirm('Are you sure you want to delete this employment record?')) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('employment_history')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      setSuccess('Employment record deleted successfully!');
+      await loadUserData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
   const openEntryModal = (entry = null) => {
     if (entry) {
       setEditingEntry(entry);
@@ -892,8 +1015,69 @@ export default function AviationLogbook() {
                 </div>
               )}
             </div>
+
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-gray-800">Employment History</h2>
+                <button
+                  onClick={() => openEmploymentModal()}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition text-sm"
+                >
+                  <Plus size={18} />
+                  Add Employment
+                </button>
+              </div>
+
+              {employmentHistory.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>No employment history recorded yet</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {employmentHistory.map(employment => (
+                    <div key={employment.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          {employment.is_current && (
+                            <span className="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded mb-2">
+                              Current Position
+                            </span>
+                          )}
+                          <h3 className="font-semibold text-gray-800 text-lg">{employment.position}</h3>
+                          <p className="text-gray-700 font-medium">{employment.company_name}</p>
+                          {employment.company_approval_number && (
+                            <p className="text-sm text-gray-600">Approval: {employment.company_approval_number}</p>
+                          )}
+                          {employment.duties && (
+                            <p className="text-sm text-gray-600 mt-2">{employment.duties}</p>
+                          )}
+                          <p className="text-sm text-gray-500 mt-2">
+                            From: {new Date(employment.from_date).toLocaleDateString('en-GB')}
+                            {employment.to_date && ` - To: ${new Date(employment.to_date).toLocaleDateString('en-GB')}`}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => openEmploymentModal(employment)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => deleteEmployment(employment.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        ) : currentView === 'logbook' ? (
+          ) : currentView === 'logbook' ? (
           <>
             <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
               <div className="flex gap-2">
@@ -1061,10 +1245,7 @@ export default function AviationLogbook() {
               <h2 className="text-xl font-semibold text-gray-800">
                 {editingAddress ? 'Edit Address' : 'Add Address'}
               </h2>
-              <button
-                onClick={closeAddressModal}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
+              <button onClick={closeAddressModal} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={24} />
               </button>
             </div>
@@ -1090,9 +1271,7 @@ export default function AviationLogbook() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Address Line 2
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Address Line 2</label>
                 <input
                   type="text"
                   value={addressFormData.address_line_2}
@@ -1116,9 +1295,7 @@ export default function AviationLogbook() {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    County
-                  </label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">County</label>
                   <input
                     type="text"
                     value={addressFormData.county}
@@ -1219,6 +1396,141 @@ export default function AviationLogbook() {
         </div>
       )}
 
+      {showEmploymentModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-800">
+                {editingEmployment ? 'Edit Employment' : 'Add Employment'}
+              </h2>
+              <button onClick={closeEmploymentModal} className="text-gray-400 hover:text-gray-600 p-1">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={employmentFormData.company_name}
+                    onChange={(e) => setEmploymentFormData({...employmentFormData, company_name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="ABC Maintenance Ltd"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Company Approval Number
+                  </label>
+                  <input
+                    type="text"
+                    value={employmentFormData.company_approval_number}
+                    onChange={(e) => setEmploymentFormData({...employmentFormData, company_approval_number: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="UK.145.12345"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Position / Job Title <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={employmentFormData.position}
+                  onChange={(e) => setEmploymentFormData({...employmentFormData, position: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Licensed Aircraft Engineer"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Duties / Responsibilities
+                </label>
+                <textarea
+                  value={employmentFormData.duties}
+                  onChange={(e) => setEmploymentFormData({...employmentFormData, duties: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Describe your key responsibilities and duties..."
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    From Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={employmentFormData.from_date}
+                    onChange={(e) => setEmploymentFormData({...employmentFormData, from_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    To Date (leave blank if current)
+                  </label>
+                  <input
+                    type="date"
+                    value={employmentFormData.to_date}
+                    onChange={(e) => setEmploymentFormData({...employmentFormData, to_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+              </div>
+
+              <div className="flex items-center">
+                <input
+                  type="checkbox"
+                  id="is_current_employment"
+                  checked={employmentFormData.is_current}
+                  onChange={(e) => setEmploymentFormData({...employmentFormData, is_current: e.target.checked})}
+                  className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                <label htmlFor="is_current_employment" className="ml-2 text-sm text-gray-700">
+                  This is my current position
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={closeEmploymentModal}
+                  disabled={loading}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitEmployment}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loading ? (
+                    <><Loader2 className="animate-spin" size={16} /> Saving...</>
+                  ) : (
+                    editingEmployment ? 'Update Employment' : 'Add Employment'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showEntryModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
@@ -1226,10 +1538,7 @@ export default function AviationLogbook() {
               <h2 className="text-xl font-semibold text-gray-800">
                 {editingEntry ? 'Edit Entry' : 'New Logbook Entry'}
               </h2>
-              <button
-                onClick={closeEntryModal}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
+              <button onClick={closeEntryModal} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={24} />
               </button>
             </div>
@@ -1316,9 +1625,7 @@ export default function AviationLogbook() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Supervisor
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Supervisor</label>
                 <select
                   value={formData.supervisor_id}
                   onChange={(e) => setFormData({...formData, supervisor_id: e.target.value})}
@@ -1334,9 +1641,7 @@ export default function AviationLogbook() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes (Optional)
-                </label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => setFormData({...formData, notes: e.target.value})}
@@ -1378,10 +1683,7 @@ export default function AviationLogbook() {
               <h2 className="text-xl font-semibold text-gray-800">
                 {editingSupervisor ? 'Edit Supervisor' : 'Add Supervisor'}
               </h2>
-              <button
-                onClick={closeSupervisorModal}
-                className="text-gray-400 hover:text-gray-600 p-1"
-              >
+              <button onClick={closeSupervisorModal} className="text-gray-400 hover:text-gray-600 p-1">
                 <X size={24} />
               </button>
             </div>
