@@ -1,22 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, X, Edit2, Trash2, Download, LogOut, User, Loader2 } from 'lucide-react';
+import { Plus, X, Edit2, Trash2, Download, LogOut, User, Users, BookOpen, Loader2 } from 'lucide-react';
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
-     import.meta.env.VITE_SUPABASE_URL,
-     import.meta.env.VITE_SUPABASE_ANON_KEY
-   );
+  import.meta.env.VITE_SUPABASE_URL,
+  import.meta.env.VITE_SUPABASE_ANON_KEY
+);
 
 export default function AviationLogbook() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showLogin, setShowLogin] = useState(true);
+  const [currentView, setCurrentView] = useState('logbook'); // 'logbook' or 'supervisors'
   const [entries, setEntries] = useState([]);
   const [supervisors, setSupervisors] = useState([]);
   const [aircraftTypes, setAircraftTypes] = useState([]);
   const [ataChapters, setAtaChapters] = useState([]);
   const [showEntryModal, setShowEntryModal] = useState(false);
+  const [showSupervisorModal, setShowSupervisorModal] = useState(false);
   const [editingEntry, setEditingEntry] = useState(null);
+  const [editingSupervisor, setEditingSupervisor] = useState(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   
@@ -36,7 +39,12 @@ export default function AviationLogbook() {
     notes: ''
   });
 
-  // Check authentication status on mount
+  const [supervisorFormData, setSupervisorFormData] = useState({
+    approval_number: '',
+    name: '',
+    company: ''
+  });
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
@@ -50,7 +58,6 @@ export default function AviationLogbook() {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Load user data when logged in
   useEffect(() => {
     if (user) {
       loadUserData();
@@ -59,7 +66,6 @@ export default function AviationLogbook() {
 
   const loadUserData = async () => {
     try {
-      // Load entries
       const { data: entriesData, error: entriesError } = await supabase
         .from('logbook_entries')
         .select('*')
@@ -68,7 +74,6 @@ export default function AviationLogbook() {
       if (entriesError) throw entriesError;
       setEntries(entriesData || []);
 
-      // Load supervisors
       const { data: supervisorsData, error: supervisorsError } = await supabase
         .from('supervisors')
         .select('*')
@@ -77,7 +82,6 @@ export default function AviationLogbook() {
       if (supervisorsError) throw supervisorsError;
       setSupervisors(supervisorsData || []);
 
-      // Load aircraft types
       const { data: aircraftData, error: aircraftError } = await supabase
         .from('aircraft_types')
         .select('*')
@@ -86,7 +90,6 @@ export default function AviationLogbook() {
       if (aircraftError) throw aircraftError;
       setAircraftTypes(aircraftData || []);
 
-      // Load ATA chapters
       const { data: ataData, error: ataError } = await supabase
         .from('ata_chapters')
         .select('*')
@@ -147,6 +150,7 @@ export default function AviationLogbook() {
     await supabase.auth.signOut();
     setEntries([]);
     setSupervisors([]);
+    setCurrentView('logbook');
   };
 
   const openEntryModal = (entry = null) => {
@@ -237,6 +241,92 @@ export default function AviationLogbook() {
       
       if (error) throw error;
       setSuccess('Entry deleted successfully!');
+      await loadUserData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const openSupervisorModal = (supervisor = null) => {
+    if (supervisor) {
+      setEditingSupervisor(supervisor);
+      setSupervisorFormData({
+        approval_number: supervisor.approval_number,
+        name: supervisor.name,
+        company: supervisor.company
+      });
+    } else {
+      setEditingSupervisor(null);
+      setSupervisorFormData({
+        approval_number: '',
+        name: '',
+        company: ''
+      });
+    }
+    setShowSupervisorModal(true);
+  };
+
+  const closeSupervisorModal = () => {
+    setShowSupervisorModal(false);
+    setEditingSupervisor(null);
+    setError('');
+  };
+
+  const handleSubmitSupervisor = async () => {
+    try {
+      if (!supervisorFormData.approval_number || !supervisorFormData.name || !supervisorFormData.company) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      setError('');
+      setLoading(true);
+
+      const supervisorData = {
+        ...supervisorFormData,
+        user_id: user.id
+      };
+
+      if (editingSupervisor) {
+        const { error } = await supabase
+          .from('supervisors')
+          .update(supervisorData)
+          .eq('id', editingSupervisor.id);
+        
+        if (error) throw error;
+        setSuccess('Supervisor updated successfully!');
+      } else {
+        const { error } = await supabase
+          .from('supervisors')
+          .insert([supervisorData]);
+        
+        if (error) throw error;
+        setSuccess('Supervisor added successfully!');
+      }
+
+      await loadUserData();
+      closeSupervisorModal();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteSupervisor = async (id) => {
+    if (!confirm('Are you sure you want to delete this supervisor? This will not affect existing logbook entries.')) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('supervisors')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      setSuccess('Supervisor deleted successfully!');
       await loadUserData();
     } catch (err) {
       setError(err.message);
@@ -419,6 +509,32 @@ export default function AviationLogbook() {
             </button>
           </div>
         </div>
+        <div className="max-w-7xl mx-auto px-4">
+          <div className="flex gap-1 border-b border-gray-200">
+            <button
+              onClick={() => setCurrentView('logbook')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
+                currentView === 'logbook'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <BookOpen size={18} />
+              Logbook
+            </button>
+            <button
+              onClick={() => setCurrentView('supervisors')}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition ${
+                currentView === 'supervisors'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
+              }`}
+            >
+              <Users size={18} />
+              Supervisors
+            </button>
+          </div>
+        </div>
       </header>
 
       <div className="max-w-7xl mx-auto p-4">
@@ -440,93 +556,164 @@ export default function AviationLogbook() {
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
-          <div className="flex gap-2">
-            <button
-              onClick={() => openEntryModal()}
-              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
-            >
-              <Plus size={20} />
-              New Entry
-            </button>
-            <button className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition">
-              <Download size={20} />
-              Export PDF
-            </button>
-          </div>
-          <div className="text-sm text-gray-600">
-            Total Entries: <span className="font-semibold">{entries.length}</span>
-          </div>
-        </div>
-
-        {entries.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-            <div className="text-gray-400 mb-4">
-              <Plus size={64} className="mx-auto mb-2" />
+        {currentView === 'logbook' ? (
+          <>
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openEntryModal()}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                >
+                  <Plus size={20} />
+                  New Entry
+                </button>
+                <button className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+                  <Download size={20} />
+                  Export PDF
+                </button>
+              </div>
+              <div className="text-sm text-gray-600">
+                Total Entries: <span className="font-semibold">{entries.length}</span>
+              </div>
             </div>
-            <h3 className="text-xl font-semibold text-gray-700 mb-2">No entries yet</h3>
-            <p className="text-gray-600 mb-6">Start building your professional logbook</p>
-            <button
-              onClick={() => openEntryModal()}
-              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition"
-            >
-              Create Your First Entry
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-6">
-            {Object.keys(entriesByAircraft).sort().map(aircraft => (
-              <div key={aircraft} className="bg-white rounded-lg shadow-sm overflow-hidden">
-                <div className="bg-blue-600 text-white px-4 py-3">
-                  <h2 className="text-lg font-semibold">{aircraft}</h2>
+
+            {entries.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                <div className="text-gray-400 mb-4">
+                  <Plus size={64} className="mx-auto mb-2" />
                 </div>
-                <div className="divide-y divide-gray-200">
-                  {entriesByAircraft[aircraft]
-                    .sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date))
-                    .map(entry => (
-                      <div key={entry.id} className="p-4 hover:bg-gray-50 transition">
-                        <div className="flex justify-between items-start mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-3 mb-2">
-                              <span className="text-sm font-semibold text-gray-700">
-                                {new Date(entry.entry_date).toLocaleDateString('en-GB')}
-                              </span>
-                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                                Job: {entry.job_number}
-                              </span>
-                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                                {getAtaDisplay(entry.ata_chapter)}
-                              </span>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">No entries yet</h3>
+                <p className="text-gray-600 mb-6">Start building your professional logbook</p>
+                <button
+                  onClick={() => openEntryModal()}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition"
+                >
+                  Create Your First Entry
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-6">
+                {Object.keys(entriesByAircraft).sort().map(aircraft => (
+                  <div key={aircraft} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                    <div className="bg-blue-600 text-white px-4 py-3">
+                      <h2 className="text-lg font-semibold">{aircraft}</h2>
+                    </div>
+                    <div className="divide-y divide-gray-200">
+                      {entriesByAircraft[aircraft]
+                        .sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date))
+                        .map(entry => (
+                          <div key={entry.id} className="p-4 hover:bg-gray-50 transition">
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <span className="text-sm font-semibold text-gray-700">
+                                    {new Date(entry.entry_date).toLocaleDateString('en-GB')}
+                                  </span>
+                                  <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                    Job: {entry.job_number}
+                                  </span>
+                                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                    {getAtaDisplay(entry.ata_chapter)}
+                                  </span>
+                                </div>
+                                <p className="text-gray-800 font-medium mb-1">{entry.task_description}</p>
+                                <p className="text-sm text-gray-600 mb-2">
+                                  Supervisor: {getSupervisorDisplay(entry.supervisor_id)}
+                                </p>
+                                {entry.notes && (
+                                  <p className="text-sm text-gray-500 italic">Notes: {entry.notes}</p>
+                                )}
+                              </div>
+                              <div className="flex gap-2 ml-4">
+                                <button
+                                  onClick={() => openEntryModal(entry)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => deleteEntry(entry.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
                             </div>
-                            <p className="text-gray-800 font-medium mb-1">{entry.task_description}</p>
-                            <p className="text-sm text-gray-600 mb-2">
-                              Supervisor: {getSupervisorDisplay(entry.supervisor_id)}
-                            </p>
-                            {entry.notes && (
-                              <p className="text-sm text-gray-500 italic">Notes: {entry.notes}</p>
-                            )}
                           </div>
-                          <div className="flex gap-2 ml-4">
-                            <button
-                              onClick={() => openEntryModal(entry)}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
-                            >
-                              <Edit2 size={16} />
-                            </button>
-                            <button
-                              onClick={() => deleteEntry(entry.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
+                        ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
+              <div className="flex gap-2">
+                <button
+                  onClick={() => openSupervisorModal()}
+                  className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+                >
+                  <Plus size={20} />
+                  Add Supervisor
+                </button>
+              </div>
+              <div className="text-sm text-gray-600">
+                Total Supervisors: <span className="font-semibold">{supervisors.length}</span>
+              </div>
+            </div>
+
+            {supervisors.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+                <div className="text-gray-400 mb-4">
+                  <Users size={64} className="mx-auto mb-2" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-700 mb-2">No supervisors yet</h3>
+                <p className="text-gray-600 mb-6">Add supervisors to assign them to your logbook entries</p>
+                <button
+                  onClick={() => openSupervisorModal()}
+                  className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition"
+                >
+                  Add Your First Supervisor
+                </button>
+              </div>
+            ) : (
+              <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="divide-y divide-gray-200">
+                  {supervisors.map(supervisor => (
+                    <div key={supervisor.id} className="p-4 hover:bg-gray-50 transition">
+                      <div className="flex justify-between items-start">
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-gray-800 mb-1">{supervisor.name}</h3>
+                          <p className="text-sm text-gray-600 mb-1">
+                            <span className="font-medium">Approval No:</span> {supervisor.approval_number}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            <span className="font-medium">Company:</span> {supervisor.company}
+                          </p>
+                        </div>
+                        <div className="flex gap-2 ml-4">
+                          <button
+                            onClick={() => openSupervisorModal(supervisor)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => deleteSupervisor(supervisor.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                          >
+                            <Trash2 size={16} />
+                          </button>
                         </div>
                       </div>
-                    ))}
+                    </div>
+                  ))}
                 </div>
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
 
@@ -644,7 +831,7 @@ export default function AviationLogbook() {
                 </select>
                 {supervisors.length === 0 && (
                   <p className="text-xs text-gray-500 mt-1">
-                    You haven't added any supervisors yet. You can add them later.
+                    No supervisors available. Add supervisors in the Supervisors tab.
                   </p>
                 )}
               </div>
@@ -679,6 +866,92 @@ export default function AviationLogbook() {
                     <><Loader2 className="animate-spin" size={16} /> Saving...</>
                   ) : (
                     editingEntry ? 'Update Entry' : 'Create Entry'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showSupervisorModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
+            <div className="border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-800">
+                {editingSupervisor ? 'Edit Supervisor' : 'Add Supervisor'}
+              </h2>
+              <button
+                onClick={closeSupervisorModal}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Approval Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={supervisorFormData.approval_number}
+                  onChange={(e) => setSupervisorFormData({...supervisorFormData, approval_number: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., UK.145.12345"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={supervisorFormData.name}
+                  onChange={(e) => setSupervisorFormData({...supervisorFormData, name: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., John Smith"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Company <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={supervisorFormData.company}
+                  onChange={(e) => setSupervisorFormData({...supervisorFormData, company: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., ABC Maintenance Ltd"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={closeSupervisorModal}
+                  disabled={loading}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitSupervisor}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loading ? (
+                    <><Loader2 className="animate-spin" size={16} /> Saving...</>
+                  ) : (
+                    editingSupervisor ? 'Update Supervisor' : 'Add Supervisor'
                   )}
                 </button>
               </div>
