@@ -1,0 +1,691 @@
+import React, { useState, useEffect } from 'react';
+import { Plus, X, Edit2, Trash2, Download, LogOut, User, Loader2 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+     import.meta.env.VITE_SUPABASE_URL,
+     import.meta.env.VITE_SUPABASE_ANON_KEY
+   );
+
+export default function AviationLogbook() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showLogin, setShowLogin] = useState(true);
+  const [entries, setEntries] = useState([]);
+  const [supervisors, setSupervisors] = useState([]);
+  const [aircraftTypes, setAircraftTypes] = useState([]);
+  const [ataChapters, setAtaChapters] = useState([]);
+  const [showEntryModal, setShowEntryModal] = useState(false);
+  const [editingEntry, setEditingEntry] = useState(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [registerName, setRegisterName] = useState('');
+  const [registerEmail, setRegisterEmail] = useState('');
+  const [registerPassword, setRegisterPassword] = useState('');
+  
+  const [formData, setFormData] = useState({
+    entry_date: '',
+    aircraft_type: '',
+    job_number: '',
+    ata_chapter: '',
+    task_description: '',
+    supervisor_id: '',
+    notes: ''
+  });
+
+  // Check authentication status on mount
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      setLoading(false);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Load user data when logged in
+  useEffect(() => {
+    if (user) {
+      loadUserData();
+    }
+  }, [user]);
+
+  const loadUserData = async () => {
+    try {
+      // Load entries
+      const { data: entriesData, error: entriesError } = await supabase
+        .from('logbook_entries')
+        .select('*')
+        .order('entry_date', { ascending: false });
+      
+      if (entriesError) throw entriesError;
+      setEntries(entriesData || []);
+
+      // Load supervisors
+      const { data: supervisorsData, error: supervisorsError } = await supabase
+        .from('supervisors')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (supervisorsError) throw supervisorsError;
+      setSupervisors(supervisorsData || []);
+
+      // Load aircraft types
+      const { data: aircraftData, error: aircraftError } = await supabase
+        .from('aircraft_types')
+        .select('*')
+        .order('type_code');
+      
+      if (aircraftError) throw aircraftError;
+      setAircraftTypes(aircraftData || []);
+
+      // Load ATA chapters
+      const { data: ataData, error: ataError } = await supabase
+        .from('ata_chapters')
+        .select('*')
+        .order('chapter_code');
+      
+      if (ataError) throw ataError;
+      setAtaChapters(ataData || []);
+
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Failed to load data');
+    }
+  };
+
+  const handleLogin = async () => {
+    try {
+      setError('');
+      setLoading(true);
+      const { error } = await supabase.auth.signInWithPassword({
+        email: loginEmail,
+        password: loginPassword,
+      });
+      
+      if (error) throw error;
+      setSuccess('Logged in successfully!');
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRegister = async () => {
+    try {
+      setError('');
+      setLoading(true);
+      const { error } = await supabase.auth.signUp({
+        email: registerEmail,
+        password: registerPassword,
+        options: {
+          data: {
+            full_name: registerName
+          }
+        }
+      });
+      
+      if (error) throw error;
+      setSuccess('Registration successful! Please check your email to verify your account.');
+      setShowLogin(true);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setEntries([]);
+    setSupervisors([]);
+  };
+
+  const openEntryModal = (entry = null) => {
+    if (entry) {
+      setEditingEntry(entry);
+      setFormData({
+        entry_date: entry.entry_date,
+        aircraft_type: entry.aircraft_type,
+        job_number: entry.job_number,
+        ata_chapter: entry.ata_chapter,
+        task_description: entry.task_description,
+        supervisor_id: entry.supervisor_id || '',
+        notes: entry.notes || ''
+      });
+    } else {
+      setEditingEntry(null);
+      setFormData({
+        entry_date: new Date().toISOString().split('T')[0],
+        aircraft_type: '',
+        job_number: '',
+        ata_chapter: '',
+        task_description: '',
+        supervisor_id: '',
+        notes: ''
+      });
+    }
+    setShowEntryModal(true);
+  };
+
+  const closeEntryModal = () => {
+    setShowEntryModal(false);
+    setEditingEntry(null);
+    setError('');
+  };
+
+  const handleSubmitEntry = async () => {
+    try {
+      if (!formData.entry_date || !formData.aircraft_type || !formData.job_number || 
+          !formData.ata_chapter || !formData.task_description) {
+        setError('Please fill in all required fields');
+        return;
+      }
+
+      setError('');
+      setLoading(true);
+
+      const entryData = {
+        ...formData,
+        user_id: user.id,
+        supervisor_id: formData.supervisor_id || null
+      };
+
+      if (editingEntry) {
+        const { error } = await supabase
+          .from('logbook_entries')
+          .update(entryData)
+          .eq('id', editingEntry.id);
+        
+        if (error) throw error;
+        setSuccess('Entry updated successfully!');
+      } else {
+        const { error } = await supabase
+          .from('logbook_entries')
+          .insert([entryData]);
+        
+        if (error) throw error;
+        setSuccess('Entry created successfully!');
+      }
+
+      await loadUserData();
+      closeEntryModal();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const deleteEntry = async (id) => {
+    if (!confirm('Are you sure you want to delete this entry?')) return;
+
+    try {
+      setLoading(true);
+      const { error } = await supabase
+        .from('logbook_entries')
+        .delete()
+        .eq('id', id);
+      
+      if (error) throw error;
+      setSuccess('Entry deleted successfully!');
+      await loadUserData();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const entriesByAircraft = entries.reduce((acc, entry) => {
+    if (!acc[entry.aircraft_type]) acc[entry.aircraft_type] = [];
+    acc[entry.aircraft_type].push(entry);
+    return acc;
+  }, {});
+
+  const getSupervisorDisplay = (supervisorId) => {
+    const supervisor = supervisors.find(s => s.id === supervisorId);
+    if (!supervisor) return 'No supervisor assigned';
+    return `${supervisor.approval_number} – ${supervisor.name} – ${supervisor.company}`;
+  };
+
+  const getAtaDisplay = (ataCode) => {
+    const ata = ataChapters.find(a => a.chapter_code === ataCode);
+    return ata ? `${ata.chapter_code} - ${ata.chapter_name}` : ataCode;
+  };
+
+  if (loading && !user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <Loader2 className="animate-spin text-blue-600" size={48} />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="bg-white rounded-lg shadow-xl p-8 w-full max-w-md">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">Aviation Logbook</h1>
+            <p className="text-gray-600">Professional maintenance record keeping</p>
+          </div>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+              {error}
+            </div>
+          )}
+
+          {success && (
+            <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm">
+              {success}
+            </div>
+          )}
+
+          {showLogin ? (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-gray-700 mb-4">Login</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="your@email.com"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="••••••••"
+                  disabled={loading}
+                  onKeyPress={(e) => e.key === 'Enter' && handleLogin()}
+                />
+              </div>
+              <button
+                onClick={handleLogin}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 className="animate-spin" size={20} /> Logging in...</> : 'Login'}
+              </button>
+              <p className="text-center text-sm text-gray-600">
+                Don't have an account?{' '}
+                <button
+                  onClick={() => {
+                    setShowLogin(false);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="text-blue-600 hover:underline"
+                  disabled={loading}
+                >
+                  Register
+                </button>
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <h2 className="text-xl font-semibold text-gray-700 mb-4">Register</h2>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  value={registerName}
+                  onChange={(e) => setRegisterName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="John Smith"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                <input
+                  type="email"
+                  value={registerEmail}
+                  onChange={(e) => setRegisterEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="your@email.com"
+                  disabled={loading}
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input
+                  type="password"
+                  value={registerPassword}
+                  onChange={(e) => setRegisterPassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="••••••••"
+                  disabled={loading}
+                />
+              </div>
+              <button
+                onClick={handleRegister}
+                disabled={loading}
+                className="w-full bg-blue-600 text-white py-2 rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {loading ? <><Loader2 className="animate-spin" size={20} /> Creating account...</> : 'Register'}
+              </button>
+              <p className="text-center text-sm text-gray-600">
+                Already have an account?{' '}
+                <button
+                  onClick={() => {
+                    setShowLogin(true);
+                    setError('');
+                    setSuccess('');
+                  }}
+                  className="text-blue-600 hover:underline"
+                  disabled={loading}
+                >
+                  Login
+                </button>
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+          <h1 className="text-2xl font-bold text-gray-800">Aviation Logbook</h1>
+          <div className="flex items-center gap-4">
+            <span className="text-sm text-gray-600">{user.email}</span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 p-2 rounded-md hover:bg-gray-100"
+            >
+              <LogOut size={20} />
+              <span className="text-sm">Logout</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      <div className="max-w-7xl mx-auto p-4">
+        {success && (
+          <div className="mb-4 p-3 bg-green-50 border border-green-200 text-green-700 rounded-md text-sm flex justify-between items-center">
+            <span>{success}</span>
+            <button onClick={() => setSuccess('')} className="text-green-700 hover:text-green-900">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        {error && (
+          <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm flex justify-between items-center">
+            <span>{error}</span>
+            <button onClick={() => setError('')} className="text-red-700 hover:text-red-900">
+              <X size={16} />
+            </button>
+          </div>
+        )}
+
+        <div className="bg-white rounded-lg shadow-sm p-4 mb-6 flex justify-between items-center">
+          <div className="flex gap-2">
+            <button
+              onClick={() => openEntryModal()}
+              className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition"
+            >
+              <Plus size={20} />
+              New Entry
+            </button>
+            <button className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-md hover:bg-gray-200 transition">
+              <Download size={20} />
+              Export PDF
+            </button>
+          </div>
+          <div className="text-sm text-gray-600">
+            Total Entries: <span className="font-semibold">{entries.length}</span>
+          </div>
+        </div>
+
+        {entries.length === 0 ? (
+          <div className="bg-white rounded-lg shadow-sm p-12 text-center">
+            <div className="text-gray-400 mb-4">
+              <Plus size={64} className="mx-auto mb-2" />
+            </div>
+            <h3 className="text-xl font-semibold text-gray-700 mb-2">No entries yet</h3>
+            <p className="text-gray-600 mb-6">Start building your professional logbook</p>
+            <button
+              onClick={() => openEntryModal()}
+              className="bg-blue-600 text-white px-6 py-3 rounded-md hover:bg-blue-700 transition"
+            >
+              Create Your First Entry
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.keys(entriesByAircraft).sort().map(aircraft => (
+              <div key={aircraft} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="bg-blue-600 text-white px-4 py-3">
+                  <h2 className="text-lg font-semibold">{aircraft}</h2>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {entriesByAircraft[aircraft]
+                    .sort((a, b) => new Date(b.entry_date) - new Date(a.entry_date))
+                    .map(entry => (
+                      <div key={entry.id} className="p-4 hover:bg-gray-50 transition">
+                        <div className="flex justify-between items-start mb-3">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="text-sm font-semibold text-gray-700">
+                                {new Date(entry.entry_date).toLocaleDateString('en-GB')}
+                              </span>
+                              <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
+                                Job: {entry.job_number}
+                              </span>
+                              <span className="text-xs bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                                {getAtaDisplay(entry.ata_chapter)}
+                              </span>
+                            </div>
+                            <p className="text-gray-800 font-medium mb-1">{entry.task_description}</p>
+                            <p className="text-sm text-gray-600 mb-2">
+                              Supervisor: {getSupervisorDisplay(entry.supervisor_id)}
+                            </p>
+                            {entry.notes && (
+                              <p className="text-sm text-gray-500 italic">Notes: {entry.notes}</p>
+                            )}
+                          </div>
+                          <div className="flex gap-2 ml-4">
+                            <button
+                              onClick={() => openEntryModal(entry)}
+                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                            <button
+                              onClick={() => deleteEntry(entry.id)}
+                              className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {showEntryModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center">
+              <h2 className="text-xl font-semibold text-gray-800">
+                {editingEntry ? 'Edit Entry' : 'New Logbook Entry'}
+              </h2>
+              <button
+                onClick={closeEntryModal}
+                className="text-gray-400 hover:text-gray-600 p-1"
+              >
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              {error && (
+                <div className="p-3 bg-red-50 border border-red-200 text-red-700 rounded-md text-sm">
+                  {error}
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Date <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.entry_date}
+                    onChange={(e) => setFormData({...formData, entry_date: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Aircraft Type <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.aircraft_type}
+                    onChange={(e) => setFormData({...formData, aircraft_type: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select aircraft</option>
+                    {aircraftTypes.map(type => (
+                      <option key={type.id} value={type.type_code}>{type.type_code}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Job Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.job_number}
+                    onChange={(e) => setFormData({...formData, job_number: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="e.g., JOB-2024-001"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    ATA Chapter <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={formData.ata_chapter}
+                    onChange={(e) => setFormData({...formData, ata_chapter: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select ATA chapter</option>
+                    {ataChapters.map(ata => (
+                      <option key={ata.id} value={ata.chapter_code}>
+                        {ata.chapter_code} - {ata.chapter_name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Task Description <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={formData.task_description}
+                  onChange={(e) => setFormData({...formData, task_description: e.target.value})}
+                  rows={3}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Describe the maintenance task performed..."
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Supervisor
+                </label>
+                <select
+                  value={formData.supervisor_id}
+                  onChange={(e) => setFormData({...formData, supervisor_id: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">No supervisor assigned</option>
+                  {supervisors.map(sup => (
+                    <option key={sup.id} value={sup.id}>
+                      {sup.approval_number} – {sup.name} – {sup.company}
+                    </option>
+                  ))}
+                </select>
+                {supervisors.length === 0 && (
+                  <p className="text-xs text-gray-500 mt-1">
+                    You haven't added any supervisors yet. You can add them later.
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={formData.notes}
+                  onChange={(e) => setFormData({...formData, notes: e.target.value})}
+                  rows={2}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Additional notes or observations..."
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+                <button
+                  onClick={closeEntryModal}
+                  disabled={loading}
+                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 transition disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSubmitEntry}
+                  disabled={loading}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+                >
+                  {loading ? (
+                    <><Loader2 className="animate-spin" size={16} /> Saving...</>
+                  ) : (
+                    editingEntry ? 'Update Entry' : 'Create Entry'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
