@@ -16,32 +16,14 @@ export default function UserManagementPanel({ currentUserId }) {
   const loadUsers = async () => {
     setLoading(true);
     try {
-      // Fetch all profiles with their auth user info
+      // Fetch all profiles (email is now stored in profiles table)
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-
-      // Fetch auth user emails separately
-      const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-
-      if (authError) {
-        // If admin.listUsers fails, just use profiles data without emails
-        console.warn('Could not fetch auth users:', authError);
-        setUsers(data || []);
-      } else {
-        // Merge profile data with auth emails
-        const usersWithEmails = data.map(profile => {
-          const authUser = authUsers.users.find(u => u.id === profile.id);
-          return {
-            ...profile,
-            email: authUser?.email || 'N/A'
-          };
-        });
-        setUsers(usersWithEmails);
-      }
+      setUsers(data || []);
     } catch (err) {
       console.error('Error loading users:', err);
       setError('Failed to load users');
@@ -84,8 +66,7 @@ export default function UserManagementPanel({ currentUserId }) {
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
     return (
-      user.first_name?.toLowerCase().includes(searchLower) ||
-      user.last_name?.toLowerCase().includes(searchLower) ||
+      user.full_name?.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower)
     );
   });
@@ -155,7 +136,7 @@ export default function UserManagementPanel({ currentUserId }) {
                         <div className="flex items-center gap-3 mb-2">
                           <div>
                             <p className="font-semibold text-gray-900">
-                              {user.first_name} {user.last_name}
+                              {user.full_name}
                             </p>
                             <p className="text-sm text-gray-500 flex items-center gap-1">
                               <Mail size={14} />
@@ -176,7 +157,7 @@ export default function UserManagementPanel({ currentUserId }) {
                         </div>
                       </div>
                       <button
-                        onClick={() => toggleAdminStatus(user.id, true, `${user.first_name} ${user.last_name}`)}
+                        onClick={() => toggleAdminStatus(user.id, true, user.full_name)}
                         disabled={user.id === currentUserId}
                         className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition ${
                           user.id === currentUserId
@@ -211,7 +192,7 @@ export default function UserManagementPanel({ currentUserId }) {
                       <div className="flex-1">
                         <div className="mb-2">
                           <p className="font-medium text-gray-900">
-                            {user.first_name} {user.last_name}
+                            {user.full_name}
                           </p>
                           <p className="text-sm text-gray-500 flex items-center gap-1">
                             <Mail size={14} />
@@ -226,7 +207,7 @@ export default function UserManagementPanel({ currentUserId }) {
                         </div>
                       </div>
                       <button
-                        onClick={() => toggleAdminStatus(user.id, false, `${user.first_name} ${user.last_name}`)}
+                        onClick={() => toggleAdminStatus(user.id, false, user.full_name)}
                         className="flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 text-sm transition"
                         title="Grant admin access"
                       >

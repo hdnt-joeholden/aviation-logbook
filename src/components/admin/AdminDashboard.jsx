@@ -48,23 +48,30 @@ export default function AdminDashboard({ engines, aircraftTypes, aircraftEngines
 
       if (entriesError) throw entriesError;
 
-      // Get recent activity (last 5 entries)
-      const { data: recentData, error: recentError } = await supabase
+      // Get recent activity (last 5 entries) - fetch separately to avoid foreign key issues
+      const { data: entriesData, error: recentError } = await supabase
         .from('logbook_entries')
-        .select(`
-          id,
-          entry_date,
-          task_description,
-          created_at,
-          profiles:user_id (
-            first_name,
-            last_name
-          )
-        `)
+        .select('id, entry_date, task_description, created_at, user_id')
         .order('created_at', { ascending: false })
         .limit(5);
 
       if (recentError) throw recentError;
+
+      // Fetch user names for the entries
+      const recentData = await Promise.all(
+        (entriesData || []).map(async (entry) => {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', entry.user_id)
+            .single();
+
+          return {
+            ...entry,
+            profiles: { full_name: profile?.full_name || 'Unknown' }
+          };
+        })
+      );
 
       setStats({
         totalUsers: userCount || 0,
