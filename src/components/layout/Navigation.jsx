@@ -1,13 +1,18 @@
 import React from 'react';
-import { BookOpen, Users, Plane, Settings } from 'lucide-react';
+import { BookOpen, Users, Plane, Settings, Shield } from 'lucide-react';
 
-export default function Navigation({ currentView, onViewChange }) {
+export default function Navigation({ currentView, onViewChange, isAdmin }) {
   const tabs = [
     { id: 'logbook', label: 'Logbook', icon: BookOpen },
     { id: 'aircraft', label: 'Aircraft', icon: Plane },
     { id: 'supervisors', label: 'Supervisors', icon: Users },
     { id: 'profile', label: 'Profile', icon: Settings }
   ];
+
+  // Add admin tab only for admin users
+  if (isAdmin) {
+    tabs.push({ id: 'admin', label: 'Admin', icon: Shield });
+  }
 
   return (
     <div className="bg-white border-b border-gray-200">

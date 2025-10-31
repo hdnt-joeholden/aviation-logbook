@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 export default function AircraftModal({
@@ -10,9 +10,41 @@ export default function AircraftModal({
   editingAircraft,
   loading,
   error,
-  aircraftTypes
+  aircraftTypes,
+  engines,
+  aircraftEngines
 }) {
   if (!isOpen) return null;
+
+  // Compute compatible engines based on selected aircraft type
+  const compatibleEngines = useMemo(() => {
+    if (!formData.aircraft_type_id) return [];
+
+    // Get engine IDs that are compatible with this aircraft type
+    const compatibleEngineIds = aircraftEngines
+      .filter(ae => ae.aircraft_type_id === formData.aircraft_type_id)
+      .map(ae => ae.engine_id);
+
+    // Filter engines and add is_common flag
+    return engines
+      .filter(e => compatibleEngineIds.includes(e.id))
+      .map(engine => {
+        const link = aircraftEngines.find(
+          ae => ae.aircraft_type_id === formData.aircraft_type_id && ae.engine_id === engine.id
+        );
+        return {
+          ...engine,
+          is_common: link?.is_common || false
+        };
+      })
+      .sort((a, b) => {
+        // Sort common engines first
+        if (a.is_common && !b.is_common) return -1;
+        if (!a.is_common && b.is_common) return 1;
+        // Then sort by manufacturer and model
+        return `${a.manufacturer} ${a.model}`.localeCompare(`${b.manufacturer} ${b.model}`);
+      });
+  }, [formData.aircraft_type_id, engines, aircraftEngines]);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -55,12 +87,10 @@ export default function AircraftModal({
             <select
               value={formData.aircraft_type_id}
               onChange={(e) => {
-                const selectedType = aircraftTypes.find(t => t.id === e.target.value);
                 setFormData({
                   ...formData,
                   aircraft_type_id: e.target.value,
-                  // Auto-fill manufacturer if available
-                  manufacturer: selectedType?.manufacturer || formData.manufacturer
+                  engine_id: '' // Reset engine when aircraft type changes
                 });
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -68,10 +98,39 @@ export default function AircraftModal({
               <option value="">Select aircraft type</option>
               {aircraftTypes.map(type => (
                 <option key={type.id} value={type.id}>
-                  {type.type_code} - {type.type_name} {type.engine_type ? `(${type.engine_type})` : ''}
+                  {type.type_code}
                 </option>
               ))}
             </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Engine Type <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={formData.engine_id}
+              onChange={(e) => setFormData({...formData, engine_id: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={!formData.aircraft_type_id}
+            >
+              <option value="">
+                {!formData.aircraft_type_id
+                  ? 'Select aircraft type first'
+                  : 'Select engine type'}
+              </option>
+              {compatibleEngines.map(engine => (
+                <option key={engine.id} value={engine.id}>
+                  {engine.full_designation || `${engine.manufacturer} ${engine.model}${engine.variant ? `-${engine.variant}` : ''}`}
+                  {engine.is_common ? ' (Common)' : ''}
+                </option>
+              ))}
+            </select>
+            {compatibleEngines.length === 0 && formData.aircraft_type_id && (
+              <p className="text-xs text-amber-600 mt-1">
+                No engines configured for this aircraft type. Contact admin.
+              </p>
+            )}
           </div>
 
           <div className="grid grid-cols-2 gap-4">

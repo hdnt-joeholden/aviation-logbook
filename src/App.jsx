@@ -29,6 +29,7 @@ import ProfileView from './components/views/ProfileView';
 import LogbookView from './components/views/LogbookView';
 import SupervisorsView from './components/views/SupervisorsView';
 import AircraftView from './components/views/AircraftView';
+import AdminView from './components/views/AdminView';
 
 export default function AviationLogbook() {
   const { user, loading: authLoading, login, register, logout } = useAuth();
@@ -37,6 +38,8 @@ export default function AviationLogbook() {
     supervisors,
     aircraftTypes,
     userAircraft,
+    engines,
+    aircraftEngines,
     ataChapters,
     profile,
     addresses,
@@ -133,6 +136,7 @@ export default function AviationLogbook() {
   const [aircraftFormData, setAircraftFormData] = useState({
     registration: '',
     aircraft_type_id: '',
+    engine_id: '',
     manufacturer: '',
     serial_number: '',
     year_of_manufacture: '',
@@ -444,6 +448,7 @@ export default function AviationLogbook() {
       setAircraftFormData({
         registration: aircraft.registration,
         aircraft_type_id: aircraft.aircraft_type_id,
+        engine_id: aircraft.engine_id || '',
         manufacturer: aircraft.manufacturer || '',
         serial_number: aircraft.serial_number || '',
         year_of_manufacture: aircraft.year_of_manufacture || '',
@@ -455,6 +460,7 @@ export default function AviationLogbook() {
       setAircraftFormData({
         registration: '',
         aircraft_type_id: '',
+        engine_id: '',
         manufacturer: '',
         serial_number: '',
         year_of_manufacture: '',
@@ -473,8 +479,8 @@ export default function AviationLogbook() {
 
   const handleSubmitAircraft = async () => {
     try {
-      if (!aircraftFormData.registration || !aircraftFormData.aircraft_type_id) {
-        setError('Please fill in all required fields');
+      if (!aircraftFormData.registration || !aircraftFormData.aircraft_type_id || !aircraftFormData.engine_id) {
+        setError('Please fill in all required fields (registration, aircraft type, and engine)');
         return;
       }
 
@@ -482,9 +488,15 @@ export default function AviationLogbook() {
       setLoading(true);
 
       const aircraftData = {
-        ...aircraftFormData,
-        user_id: user.id,
-        registration: aircraftFormData.registration.toUpperCase()
+        registration: aircraftFormData.registration.toUpperCase(),
+        aircraft_type_id: aircraftFormData.aircraft_type_id,
+        engine_id: aircraftFormData.engine_id,
+        manufacturer: aircraftFormData.manufacturer || null,
+        serial_number: aircraftFormData.serial_number || null,
+        year_of_manufacture: aircraftFormData.year_of_manufacture ? parseInt(aircraftFormData.year_of_manufacture) : null,
+        notes: aircraftFormData.notes || null,
+        is_active: aircraftFormData.is_active,
+        user_id: user.id
       };
 
       if (editingAircraft) {
@@ -770,11 +782,14 @@ export default function AviationLogbook() {
     );
   }
 
+  // Check if user is admin
+  const isAdmin = profile?.is_admin || false;
+
   // Main application view
   return (
     <div className="min-h-screen bg-gray-50">
       <Header userEmail={user.email} onLogout={handleLogout} />
-      <Navigation currentView={currentView} onViewChange={setCurrentView} />
+      <Navigation currentView={currentView} onViewChange={setCurrentView} isAdmin={isAdmin} />
 
       <div className="max-w-7xl mx-auto p-4">
         {success && (
@@ -825,12 +840,21 @@ export default function AviationLogbook() {
             onOpenAircraftModal={handleOpenAircraftModal}
             onDeleteAircraft={deleteAircraft}
             aircraftTypes={aircraftTypes}
+            engines={engines}
           />
         ) : currentView === 'supervisors' ? (
           <SupervisorsView
             supervisors={supervisors}
             onOpenSupervisorModal={handleOpenSupervisorModal}
             onDeleteSupervisor={deleteSupervisor}
+          />
+        ) : currentView === 'admin' && isAdmin ? (
+          <AdminView
+            engines={engines}
+            aircraftTypes={aircraftTypes}
+            aircraftEngines={aircraftEngines}
+            onReloadData={reloadData}
+            currentUserId={user.id}
           />
         ) : null}
       </div>
@@ -882,6 +906,8 @@ export default function AviationLogbook() {
         loading={loading}
         error={error}
         aircraftTypes={aircraftTypes}
+        engines={engines}
+        aircraftEngines={aircraftEngines}
       />
 
       <SupervisorModal

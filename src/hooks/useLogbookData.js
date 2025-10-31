@@ -6,6 +6,8 @@ export function useLogbookData(user) {
   const [supervisors, setSupervisors] = useState([]);
   const [aircraftTypes, setAircraftTypes] = useState([]);
   const [userAircraft, setUserAircraft] = useState([]);
+  const [engines, setEngines] = useState([]);
+  const [aircraftEngines, setAircraftEngines] = useState([]); // aircraft-engine relationships
   const [ataChapters, setAtaChapters] = useState([]);
   const [profile, setProfile] = useState(null);
   const [addresses, setAddresses] = useState([]);
@@ -49,6 +51,21 @@ export function useLogbookData(user) {
 
       if (userAircraftError) throw userAircraftError;
       setUserAircraft(userAircraftData || []);
+
+      const { data: enginesData, error: enginesError } = await supabase
+        .from('engines')
+        .select('*')
+        .order('manufacturer, model, variant');
+
+      if (enginesError) throw enginesError;
+      setEngines(enginesData || []);
+
+      const { data: aircraftEnginesData, error: aircraftEnginesError } = await supabase
+        .from('aircraft_type_engines')
+        .select('*');
+
+      if (aircraftEnginesError) throw aircraftEnginesError;
+      setAircraftEngines(aircraftEnginesData || []);
 
       const { data: ataData, error: ataError } = await supabase
         .from('ata_chapters')
@@ -100,6 +117,8 @@ export function useLogbookData(user) {
     supervisors,
     aircraftTypes,
     userAircraft,
+    engines,
+    aircraftEngines,
     ataChapters,
     profile,
     addresses,

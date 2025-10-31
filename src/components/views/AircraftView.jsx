@@ -5,10 +5,15 @@ export default function AircraftView({
   userAircraft,
   onOpenAircraftModal,
   onDeleteAircraft,
-  aircraftTypes
+  aircraftTypes,
+  engines
 }) {
   const getAircraftTypeInfo = (typeId) => {
     return aircraftTypes.find(t => t.id === typeId);
+  };
+
+  const getEngineInfo = (engineId) => {
+    return engines.find(e => e.id === engineId);
   };
 
   const activeAircraft = userAircraft.filter(a => a.is_active);
@@ -59,6 +64,7 @@ export default function AircraftView({
               <div className="divide-y divide-gray-200">
                 {activeAircraft.map(aircraft => {
                   const typeInfo = getAircraftTypeInfo(aircraft.aircraft_type_id);
+                  const engineInfo = getEngineInfo(aircraft.engine_id);
                   return (
                     <div key={aircraft.id} className="p-4 hover:bg-gray-50 transition">
                       <div className="flex justify-between items-start">
@@ -73,12 +79,11 @@ export default function AircraftView({
                           {typeInfo && (
                             <div className="mb-2">
                               <p className="text-lg text-gray-700 font-medium">
-                                {typeInfo.type_code} - {typeInfo.type_name}
+                                {typeInfo.type_code}
                               </p>
-                              {typeInfo.engine_type && (
+                              {engineInfo && (
                                 <p className="text-sm text-gray-600">
-                                  Engine: {typeInfo.engine_type}
-                                  {typeInfo.engine_variant && ` (${typeInfo.engine_variant})`}
+                                  Engine: {engineInfo.full_designation || `${engineInfo.manufacturer} ${engineInfo.model}${engineInfo.variant ? `-${engineInfo.variant}` : ''}`}
                                 </p>
                               )}
                             </div>
@@ -132,6 +137,7 @@ export default function AircraftView({
               <div className="divide-y divide-gray-200">
                 {inactiveAircraft.map(aircraft => {
                   const typeInfo = getAircraftTypeInfo(aircraft.aircraft_type_id);
+                  const engineInfo = getEngineInfo(aircraft.engine_id);
                   return (
                     <div key={aircraft.id} className="p-4 hover:bg-gray-50 transition opacity-75">
                       <div className="flex justify-between items-start">
@@ -146,12 +152,11 @@ export default function AircraftView({
                           {typeInfo && (
                             <div className="mb-2">
                               <p className="text-lg text-gray-600 font-medium">
-                                {typeInfo.type_code} - {typeInfo.type_name}
+                                {typeInfo.type_code}
                               </p>
-                              {typeInfo.engine_type && (
+                              {engineInfo && (
                                 <p className="text-sm text-gray-500">
-                                  Engine: {typeInfo.engine_type}
-                                  {typeInfo.engine_variant && ` (${typeInfo.engine_variant})`}
+                                  Engine: {engineInfo.full_designation || `${engineInfo.manufacturer} ${engineInfo.model}${engineInfo.variant ? `-${engineInfo.variant}` : ''}`}
                                 </p>
                               )}
                             </div>
