@@ -45,6 +45,11 @@ export default function SupervisorsView({
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-gray-800 mb-1">{supervisor.name}</h3>
+                    {supervisor.license_number && (
+                      <p className="text-sm text-gray-600 mb-1">
+                        <span className="font-medium">License No:</span> {supervisor.license_number}
+                      </p>
+                    )}
                     <p className="text-sm text-gray-600 mb-1">
                       <span className="font-medium">Approval No:</span> {supervisor.approval_number}
                     </p>

@@ -1,8 +1,9 @@
 import React from 'react';
-import { BookOpen, Users, Plane, Settings, Shield } from 'lucide-react';
+import { BookOpen, Users, Plane, Settings, Shield, LayoutDashboard } from 'lucide-react';
 
 export default function Navigation({ currentView, onViewChange, isAdmin }) {
   const tabs = [
+    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'logbook', label: 'Logbook', icon: BookOpen },
     { id: 'aircraft', label: 'Aircraft', icon: Plane },
     { id: 'supervisors', label: 'Supervisors', icon: Users },

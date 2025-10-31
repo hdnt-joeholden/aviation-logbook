@@ -9,9 +9,13 @@ export default function SupervisorModal({
   onSubmit,
   editingSupervisor,
   loading,
-  error
+  error,
+  employmentHistory
 }) {
   if (!isOpen) return null;
+
+  // Get unique companies from employment history
+  const companies = [...new Set(employmentHistory.map(emp => emp.company))].filter(Boolean);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -34,19 +38,6 @@ export default function SupervisorModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Approval Number <span className="text-red-500">*</span>
-            </label>
-            <input
-              type="text"
-              value={formData.approval_number}
-              onChange={(e) => setFormData({...formData, approval_number: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., UK.145.12345"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
               Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -60,15 +51,66 @@ export default function SupervisorModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Company <span className="text-red-500">*</span>
+              License Number <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
-              value={formData.company}
-              onChange={(e) => setFormData({...formData, company: e.target.value})}
+              value={formData.license_number || ''}
+              onChange={(e) => setFormData({...formData, license_number: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., ABC Maintenance Ltd"
+              placeholder="e.g., LIC123456"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Approval Number <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData.approval_number}
+              onChange={(e) => setFormData({...formData, approval_number: e.target.value})}
+              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              placeholder="e.g., UK.145.12345"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Company <span className="text-red-500">*</span>
+            </label>
+            {companies.length > 0 ? (
+              <select
+                value={formData.company}
+                onChange={(e) => setFormData({...formData, company: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select a company...</option>
+                {companies.map((company, index) => (
+                  <option key={index} value={company}>
+                    {company}
+                  </option>
+                ))}
+                <option value="__other__">Other (enter manually)</option>
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={formData.company}
+                onChange={(e) => setFormData({...formData, company: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="e.g., ABC Maintenance Ltd"
+              />
+            )}
+            {formData.company === '__other__' && (
+              <input
+                type="text"
+                value={formData.company_manual || ''}
+                onChange={(e) => setFormData({...formData, company: e.target.value, company_manual: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
+                placeholder="Enter company name"
+              />
+            )}
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">

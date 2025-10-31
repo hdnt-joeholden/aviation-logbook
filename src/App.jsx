@@ -25,6 +25,7 @@ import SupervisorModal from './components/modals/SupervisorModal';
 import AircraftModal from './components/modals/AircraftModal';
 
 // Views
+import DashboardView from './components/views/DashboardView';
 import ProfileView from './components/views/ProfileView';
 import LogbookView from './components/views/LogbookView';
 import SupervisorsView from './components/views/SupervisorsView';
@@ -68,7 +69,7 @@ export default function AviationLogbook() {
   } = useModalState();
 
   const [showLogin, setShowLogin] = useState(true);
-  const [currentView, setCurrentView] = useState('logbook');
+  const [currentView, setCurrentView] = useState('dashboard');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -98,8 +99,9 @@ export default function AviationLogbook() {
   });
 
   const [supervisorFormData, setSupervisorFormData] = useState({
-    approval_number: '',
     name: '',
+    license_number: '',
+    approval_number: '',
     company: ''
   });
 
@@ -648,14 +650,16 @@ export default function AviationLogbook() {
   const handleOpenSupervisorModal = (supervisor = null) => {
     if (supervisor) {
       setSupervisorFormData({
-        approval_number: supervisor.approval_number,
         name: supervisor.name,
+        license_number: supervisor.license_number || '',
+        approval_number: supervisor.approval_number,
         company: supervisor.company
       });
     } else {
       setSupervisorFormData({
-        approval_number: '',
         name: '',
+        license_number: '',
+        approval_number: '',
         company: ''
       });
     }
@@ -669,7 +673,7 @@ export default function AviationLogbook() {
 
   const handleSubmitSupervisor = async () => {
     try {
-      if (!supervisorFormData.approval_number || !supervisorFormData.name || !supervisorFormData.company) {
+      if (!supervisorFormData.name || !supervisorFormData.license_number || !supervisorFormData.approval_number || !supervisorFormData.company) {
         setError('Please fill in all required fields');
         return;
       }
@@ -810,7 +814,15 @@ export default function AviationLogbook() {
           </div>
         )}
 
-        {currentView === 'profile' ? (
+        {currentView === 'dashboard' ? (
+          <DashboardView
+            entries={entries}
+            userAircraft={userAircraft}
+            supervisors={supervisors}
+            onOpenEntryModal={handleOpenEntryModal}
+            onViewChange={setCurrentView}
+          />
+        ) : currentView === 'profile' ? (
           <ProfileView
             profileFormData={profileFormData}
             setProfileFormData={setProfileFormData}
@@ -919,6 +931,7 @@ export default function AviationLogbook() {
         editingSupervisor={editingSupervisor}
         loading={loading}
         error={error}
+        employmentHistory={employmentHistory}
       />
 
       <ConfirmDialog
