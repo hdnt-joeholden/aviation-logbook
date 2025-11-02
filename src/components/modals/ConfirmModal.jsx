@@ -58,7 +58,25 @@ export default function ConfirmModal({
             </div>
             <div className="flex-1">
               <h2 className="text-lg font-semibold text-gray-900 mb-2">{title}</h2>
-              <p className="text-sm text-gray-600">{message}</p>
+              <div className="text-sm text-gray-600 whitespace-pre-wrap">
+                {message.split('\n').map((line, index) => {
+                  // Handle bold markdown **text**
+                  if (line.includes('**')) {
+                    const parts = line.split(/(\*\*.*?\*\*)/g);
+                    return (
+                      <p key={index} className={index > 0 ? 'mt-1' : ''}>
+                        {parts.map((part, i) => {
+                          if (part.startsWith('**') && part.endsWith('**')) {
+                            return <strong key={i}>{part.slice(2, -2)}</strong>;
+                          }
+                          return part;
+                        })}
+                      </p>
+                    );
+                  }
+                  return line ? <p key={index} className={index > 0 ? 'mt-1' : ''}>{line}</p> : <br key={index} />;
+                })}
+              </div>
             </div>
             <button
               onClick={onClose}

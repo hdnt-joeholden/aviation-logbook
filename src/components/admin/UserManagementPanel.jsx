@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Shield, ShieldOff, Users, Search, Mail, Calendar, UserPlus, X, Send, Clock, CheckCircle, XCircle } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import ConfirmModal from '../modals/ConfirmModal';
 
 export default function UserManagementPanel({ currentUserId }) {
   const [users, setUsers] = useState([]);
@@ -14,6 +15,15 @@ export default function UserManagementPanel({ currentUserId }) {
     email: '',
     full_name: '',
     is_admin: false
+  });
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'warning',
+    showCancel: true,
+    confirmText: 'Confirm',
+    onConfirm: () => {}
   });
 
   useEffect(() => {
@@ -157,103 +167,121 @@ export default function UserManagementPanel({ currentUserId }) {
     }
   };
 
-  const cancelInvite = async (inviteId, email) => {
-    if (!confirm(`Cancel invite for ${email}? This will remove the pending user.`)) {
-      return;
-    }
+  const cancelInvite = (inviteId, email) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Cancel Invite',
+      message: `Cancel invite for ${email}? This will remove the pending user.`,
+      variant: 'warning',
+      showCancel: true,
+      confirmText: 'Cancel Invite',
+      onConfirm: async () => {
+        try {
+          // Mark invite as expired
+          const { error: inviteError } = await supabase
+            .from('invites')
+            .update({ status: 'expired' })
+            .eq('id', inviteId);
 
-    try {
-      // Mark invite as expired
-      const { error: inviteError } = await supabase
-        .from('invites')
-        .update({ status: 'expired' })
-        .eq('id', inviteId);
+          if (inviteError) throw inviteError;
 
-      if (inviteError) throw inviteError;
+          // Also delete the pending ghost user if they exist
+          const { error: deleteError } = await supabase
+            .from('profiles')
+            .delete()
+            .eq('email', email)
+            .eq('account_status', 'pending');
 
-      // Also delete the pending ghost user if they exist
-      const { error: deleteError } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('email', email)
-        .eq('account_status', 'pending');
+          if (deleteError) {
+            console.warn('Error deleting pending user:', deleteError);
+            // Don't throw - invite was cancelled, that's the main thing
+          }
 
-      if (deleteError) {
-        console.warn('Error deleting pending user:', deleteError);
-        // Don't throw - invite was cancelled, that's the main thing
-      }
+          // Also delete from auth.users (requires service role, so this might fail - that's ok)
+          // We'll handle this on the backend if needed
 
-      // Also delete from auth.users (requires service role, so this might fail - that's ok)
-      // We'll handle this on the backend if needed
+          setSuccess('Invite cancelled and pending user removed');
+          await loadInvites();
+          await loadUsers();
 
-      setSuccess('Invite cancelled and pending user removed');
-      await loadInvites();
-      await loadUsers();
-
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      console.error('Error cancelling invite:', err);
-      setError(err.message || 'Failed to cancel invite');
-    }
-  };
-
-  const cancelPendingUser = async (userId, email) => {
-    if (!confirm(`Remove pending invitation for ${email}?`)) {
-      return;
-    }
-
-    try {
-      // Call Edge Function to fully delete pending user (profiles + auth.users)
-      const { data, error: functionError } = await supabase.functions.invoke('delete-pending-user', {
-        body: {
-          user_id: userId,
-          email: email
+          setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+          console.error('Error cancelling invite:', err);
+          setError(err.message || 'Failed to cancel invite');
         }
-      });
-
-      if (functionError) {
-        throw new Error(functionError.message || 'Failed to delete pending user');
       }
-
-      setSuccess('Pending user completely removed');
-      await loadInvites();
-      await loadUsers();
-
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      console.error('Error removing pending user:', err);
-      setError(err.message || 'Failed to remove pending user');
-    }
+    });
   };
 
-  const toggleAdminStatus = async (userId, currentStatus, userName) => {
+  const cancelPendingUser = (userId, email) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Pending User',
+      message: `Remove pending invitation for ${email}?`,
+      variant: 'warning',
+      showCancel: true,
+      confirmText: 'Remove',
+      onConfirm: async () => {
+        try {
+          // Call Edge Function to fully delete pending user (profiles + auth.users)
+          const { data, error: functionError } = await supabase.functions.invoke('delete-pending-user', {
+            body: {
+              user_id: userId,
+              email: email
+            }
+          });
+
+          if (functionError) {
+            throw new Error(functionError.message || 'Failed to delete pending user');
+          }
+
+          setSuccess('Pending user completely removed');
+          await loadInvites();
+          await loadUsers();
+
+          setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+          console.error('Error removing pending user:', err);
+          setError(err.message || 'Failed to remove pending user');
+        }
+      }
+    });
+  };
+
+  const toggleAdminStatus = (userId, currentStatus, userName) => {
     if (userId === currentUserId) {
       setError("You cannot change your own admin status");
       return;
     }
 
     const action = currentStatus ? 'remove admin access from' : 'grant admin access to';
-    if (!confirm(`Are you sure you want to ${action} ${userName}?`)) {
-      return;
-    }
+    setConfirmModal({
+      isOpen: true,
+      title: currentStatus ? 'Remove Admin Access' : 'Grant Admin Access',
+      message: `Are you sure you want to ${action} ${userName}?`,
+      variant: 'warning',
+      showCancel: true,
+      confirmText: currentStatus ? 'Remove Access' : 'Grant Access',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ is_admin: !currentStatus })
+            .eq('id', userId);
 
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ is_admin: !currentStatus })
-        .eq('id', userId);
+          if (error) throw error;
 
-      if (error) throw error;
+          setSuccess(`Successfully ${currentStatus ? 'removed admin access' : 'granted admin access'}`);
+          await loadUsers();
 
-      setSuccess(`Successfully ${currentStatus ? 'removed admin access' : 'granted admin access'}`);
-      await loadUsers();
-
-      // Clear success message after 3 seconds
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      console.error('Error updating admin status:', err);
-      setError(err.message || 'Failed to update admin status');
-    }
+          // Clear success message after 3 seconds
+          setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+          console.error('Error updating admin status:', err);
+          setError(err.message || 'Failed to update admin status');
+        }
+      }
+    });
   };
 
   // Filter users based on search term
@@ -649,6 +677,17 @@ export default function UserManagementPanel({ currentUserId }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        showCancel={confirmModal.showCancel}
+        confirmText={confirmModal.confirmText}
+      />
     </div>
   );
 }

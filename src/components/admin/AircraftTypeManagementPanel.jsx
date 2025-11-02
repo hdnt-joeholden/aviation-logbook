@@ -98,9 +98,9 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
   const handleDelete = async (typeId) => {
     try {
       // First check if any aircraft are using this type
-      const { count: aircraftCount, error: countError } = await supabase
+      const { data: aircraftData, count: aircraftCount, error: countError } = await supabase
         .from('user_aircraft')
-        .select('*', { count: 'exact', head: true })
+        .select('registration, user_id', { count: 'exact' })
         .eq('aircraft_type_id', typeId);
 
       if (countError) {
@@ -109,9 +109,9 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       }
 
       // Also check if any aircraft-engine links use this type
-      const { count: linkCount, error: linkCountError } = await supabase
+      const { data: linkData, count: linkCount, error: linkCountError } = await supabase
         .from('aircraft_type_engines')
-        .select('*', { count: 'exact', head: true })
+        .select('engines(model, manufacturer)', { count: 'exact' })
         .eq('aircraft_type_id', typeId);
 
       if (linkCountError) {
@@ -124,10 +124,47 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       const totalUsage = (aircraftCount || 0) + (linkCount || 0);
 
       if (totalUsage > 0) {
+        // Build detailed message about references
+        let detailMessage = 'This aircraft type is currently being used by:\n\n';
+
+        if (aircraftCount > 0) {
+          detailMessage += `**User Aircraft (${aircraftCount}):**\n`;
+
+          // Fetch user profiles for each aircraft
+          for (const aircraft of aircraftData) {
+            let owner = 'Unknown owner';
+            if (aircraft.user_id) {
+              const { data: profile } = await supabase
+                .from('profiles')
+                .select('forename, surname')
+                .eq('id', aircraft.user_id)
+                .single();
+
+              if (profile) {
+                owner = `${profile.forename || ''} ${profile.surname || ''}`.trim() || 'Unknown owner';
+              }
+            }
+            detailMessage += `• ${aircraft.registration} (${owner})\n`;
+          }
+          detailMessage += '\n';
+        }
+
+        if (linkCount > 0) {
+          detailMessage += `**Engine Links (${linkCount}):**\n`;
+          linkData.forEach(link => {
+            const engine = link.engines
+              ? `${link.engines.manufacturer} ${link.engines.model}`.trim()
+              : 'Unknown engine';
+            detailMessage += `• ${engine}\n`;
+          });
+        }
+
+        detailMessage += '\nPlease remove these references first before deleting this aircraft type.';
+
         setConfirmModal({
           isOpen: true,
           title: 'Cannot Delete Aircraft Type',
-          message: `This aircraft type is currently being used by ${totalUsage} item(s). Please remove those references first.`,
+          message: detailMessage,
           variant: 'warning',
           showCancel: false,
           confirmText: 'OK',

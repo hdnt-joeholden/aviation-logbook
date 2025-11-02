@@ -11,7 +11,11 @@
       "Bash(npm install:*)",
       "Bash(npx supabase:*)",
       "Bash(nul)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(taskkill:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(del nul 2)"
     ],
     "deny": [],
     "ask": []

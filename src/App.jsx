@@ -268,6 +268,11 @@ export default function AviationLogbook() {
         addresses?.some(addr => addr.is_current);
 
       if (isProfileComplete) {
+        // Skip getting started flow for admin users
+        if (profile.is_admin) {
+          return;
+        }
+
         const hasEmployment = employmentHistory?.length > 0;
         const hasAircraft = userAircraft?.length > 0;
         const hasSupervisors = supervisors?.length > 0;
@@ -888,24 +893,29 @@ export default function AviationLogbook() {
     }
   };
 
-  const deleteEntry = async (id) => {
-    if (!confirm('Are you sure you want to delete this entry?')) return;
+  const deleteEntry = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Entry',
+      message: 'Are you sure you want to delete this entry? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const { error } = await supabase
+            .from('logbook_entries')
+            .delete()
+            .eq('id', id);
 
-    try {
-      setLoading(true);
-      const { error } = await supabase
-        .from('logbook_entries')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setSuccess('Entry deleted successfully!');
-      await reloadData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+          if (error) throw error;
+          setSuccess('Entry deleted successfully!');
+          await reloadData();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   // Supervisor handlers
@@ -993,24 +1003,29 @@ export default function AviationLogbook() {
     }
   };
 
-  const deleteSupervisor = async (id) => {
-    if (!confirm('Are you sure you want to delete this supervisor?')) return;
+  const deleteSupervisor = (id) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: 'Delete Supervisor',
+      message: 'Are you sure you want to delete this supervisor? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          setLoading(true);
+          const { error } = await supabase
+            .from('supervisors')
+            .delete()
+            .eq('id', id);
 
-    try {
-      setLoading(true);
-      const { error } = await supabase
-        .from('supervisors')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      setSuccess('Supervisor deleted successfully!');
-      await reloadData();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
+          if (error) throw error;
+          setSuccess('Supervisor deleted successfully!');
+          await reloadData();
+        } catch (err) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
+        }
+      }
+    });
   };
 
   // Loading state

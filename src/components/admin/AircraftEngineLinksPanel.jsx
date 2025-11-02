@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Plus, Trash2, Star, Link as LinkIcon } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
+import ConfirmModal from '../modals/ConfirmModal';
 
 export default function AircraftEngineLinksPanel({
   engines,
@@ -13,6 +14,15 @@ export default function AircraftEngineLinksPanel({
   const [isCommon, setIsCommon] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'warning',
+    showCancel: true,
+    confirmText: 'Confirm',
+    onConfirm: () => {}
+  });
 
   // Get engines linked to selected aircraft type
   const linkedEngines = useMemo(() => {
@@ -67,22 +77,38 @@ export default function AircraftEngineLinksPanel({
     }
   };
 
-  const handleDeleteLink = async (linkId) => {
-    if (!confirm('Remove this engine compatibility?')) return;
+  const handleDeleteLink = (linkId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Remove Engine Compatibility',
+      message: 'Remove this engine compatibility?',
+      variant: 'danger',
+      showCancel: true,
+      confirmText: 'Remove',
+      onConfirm: async () => {
+        try {
+          const { error: deleteError } = await supabase
+            .from('aircraft_type_engines')
+            .delete()
+            .eq('id', linkId);
 
-    try {
-      const { error: deleteError } = await supabase
-        .from('aircraft_type_engines')
-        .delete()
-        .eq('id', linkId);
+          if (deleteError) throw deleteError;
 
-      if (deleteError) throw deleteError;
-
-      await onReloadData();
-    } catch (err) {
-      console.error('Error deleting link:', err);
-      alert('Failed to delete link: ' + err.message);
-    }
+          await onReloadData();
+        } catch (err) {
+          console.error('Error deleting link:', err);
+          setConfirmModal({
+            isOpen: true,
+            title: 'Error',
+            message: 'Failed to delete link: ' + err.message,
+            variant: 'danger',
+            showCancel: false,
+            confirmText: 'OK',
+            onConfirm: () => {}
+          });
+        }
+      }
+    });
   };
 
   const handleToggleCommon = async (linkId, currentValue) => {
@@ -97,7 +123,15 @@ export default function AircraftEngineLinksPanel({
       await onReloadData();
     } catch (err) {
       console.error('Error updating link:', err);
-      alert('Failed to update: ' + err.message);
+      setConfirmModal({
+        isOpen: true,
+        title: 'Error',
+        message: 'Failed to update: ' + err.message,
+        variant: 'danger',
+        showCancel: false,
+        confirmText: 'OK',
+        onConfirm: () => {}
+      });
     }
   };
 
@@ -275,6 +309,17 @@ export default function AircraftEngineLinksPanel({
           <p>Select an aircraft type above to manage engine compatibility</p>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        showCancel={confirmModal.showCancel}
+        confirmText={confirmModal.confirmText}
+      />
     </div>
   );
 }
