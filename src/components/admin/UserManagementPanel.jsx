@@ -411,37 +411,68 @@ export default function UserManagementPanel({ currentUserId }) {
     if (!userToDelete) return;
 
     const userName = `${userToDelete.title} ${userToDelete.forename} ${userToDelete.surname}`;
+    const userEmail = userToDelete.email;
+    const accountCreated = new Date(userToDelete.created_at).toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric'
+    });
 
+    // First confirmation - show warning
     setConfirmModal({
       isOpen: true,
       title: 'Delete User Account',
       message: `Are you sure you want to permanently delete ${userName}? This will delete all their data including entries, aircraft, supervisors, and addresses. This action cannot be undone.`,
       variant: 'danger',
       showCancel: true,
-      confirmText: 'Delete Permanently',
-      onConfirm: async () => {
-        try {
-          // Call Edge Function to fully delete user (profiles, auth.users, and all related data)
-          const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
-            body: {
-              user_id: userId,
-              email: userToDelete.email
-            }
-          });
+      confirmText: 'Continue',
+      onConfirm: () => {
+        // Second confirmation - require email verification
+        const emailVerification = prompt(
+          `⚠️ FINAL CONFIRMATION\n\n` +
+          `You are about to PERMANENTLY DELETE:\n` +
+          `• User: ${userName}\n` +
+          `• Email: ${userEmail}\n` +
+          `• Account Created: ${accountCreated}\n` +
+          `• All associated data (entries, aircraft, supervisors, addresses)\n\n` +
+          `This action CANNOT be undone.\n\n` +
+          `To confirm, please type the user's email address exactly:\n` +
+          `${userEmail}`
+        );
 
-          if (functionError) {
-            throw new Error(functionError.message || 'Failed to delete user');
-          }
-
-          setSuccess('User and all associated data deleted successfully');
-          await loadUsers();
-
-          setTimeout(() => setSuccess(''), 3000);
-        } catch (err) {
-          setError(err.message || 'Failed to delete user');
+        if (emailVerification === userEmail) {
+          // Email matches, proceed with deletion
+          performUserDeletion(userId, userToDelete);
+        } else if (emailVerification !== null) {
+          // User typed something but it didn't match
+          setError('Email verification failed. Deletion cancelled.');
         }
+        // If emailVerification is null, user clicked cancel - do nothing
       }
     });
+  };
+
+  const performUserDeletion = async (userId, userToDelete) => {
+    try {
+      // Call Edge Function to fully delete user (profiles, auth.users, and all related data)
+      const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
+        body: {
+          user_id: userId,
+          email: userToDelete.email
+        }
+      });
+
+      if (functionError) {
+        throw new Error(functionError.message || 'Failed to delete user');
+      }
+
+      setSuccess('User and all associated data deleted successfully');
+      await loadUsers();
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Failed to delete user');
+    }
   };
 
   // Filter users based on search term
