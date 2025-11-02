@@ -62,13 +62,17 @@ export default function AdminDashboard({ engines, aircraftTypes, aircraftEngines
         (entriesData || []).map(async (entry) => {
           const { data: profile } = await supabase
             .from('profiles')
-            .select('full_name')
+            .select('forename, surname, title')
             .eq('id', entry.user_id)
             .single();
 
+          const fullName = profile
+            ? `${profile.title || ''} ${profile.forename || ''} ${profile.surname || ''}`.trim()
+            : 'Unknown';
+
           return {
             ...entry,
-            profiles: { full_name: profile?.full_name || 'Unknown' }
+            profiles: { full_name: fullName }
           };
         })
       );
