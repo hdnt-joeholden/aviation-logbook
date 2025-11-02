@@ -13,19 +13,24 @@ export default function AircraftModal({
   aircraftTypes,
   engines,
   aircraftEngines,
-  employmentHistory
+  employmentHistory,
+  userAircraft
 }) {
   const [showCustomAirline, setShowCustomAirline] = useState(false);
   const [customAirline, setCustomAirline] = useState('');
 
-  // Get unique airlines from employment history
+  // Get unique airlines from employment history and previous aircraft
   const existingAirlines = useMemo(() => {
-    return employmentHistory
-      ? [...new Set(employmentHistory
-          .map(e => e.company_name)
-          .filter(c => c && c.trim() !== ''))].sort()
+    const airlinesFromEmployment = employmentHistory
+      ? employmentHistory.map(e => e.company_name).filter(c => c && c.trim() !== '')
       : [];
-  }, [employmentHistory]);
+
+    const airlinesFromAircraft = userAircraft
+      ? userAircraft.map(a => a.airline).filter(c => c && c.trim() !== '')
+      : [];
+
+    return [...new Set([...airlinesFromEmployment, ...airlinesFromAircraft])].sort();
+  }, [employmentHistory, userAircraft]);
 
   // Check if current airline is custom (not in the list)
   useEffect(() => {

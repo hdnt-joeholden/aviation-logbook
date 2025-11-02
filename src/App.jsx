@@ -1226,6 +1226,7 @@ export default function AviationLogbook() {
         engines={engines}
         aircraftEngines={aircraftEngines}
         employmentHistory={employmentHistory}
+        userAircraft={userAircraft}
       />
 
       <SupervisorModal

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Plus, Edit2, Trash2, Plane, AlertCircle } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Plus, Edit2, Trash2, Plane, Building2 } from 'lucide-react';
 
 export default function AircraftView({
   userAircraft,
@@ -16,8 +16,30 @@ export default function AircraftView({
     return engines.find(e => e.id === engineId);
   };
 
-  const activeAircraft = userAircraft.filter(a => a.is_active);
-  const inactiveAircraft = userAircraft.filter(a => !a.is_active);
+  // Group aircraft by airline
+  const aircraftByAirline = useMemo(() => {
+    const grouped = {};
+
+    userAircraft.forEach(aircraft => {
+      const airline = aircraft.airline || 'Unassigned';
+      if (!grouped[airline]) {
+        grouped[airline] = [];
+      }
+      grouped[airline].push(aircraft);
+    });
+
+    // Sort airlines alphabetically, but put 'Unassigned' last
+    const sortedAirlines = Object.keys(grouped).sort((a, b) => {
+      if (a === 'Unassigned') return 1;
+      if (b === 'Unassigned') return -1;
+      return a.localeCompare(b);
+    });
+
+    return sortedAirlines.map(airline => ({
+      airline,
+      aircraft: grouped[airline].sort((a, b) => a.registration.localeCompare(b.registration))
+    }));
+  }, [userAircraft]);
 
   return (
     <>
@@ -33,8 +55,10 @@ export default function AircraftView({
         </div>
         <div className="text-sm text-gray-600">
           Total Aircraft: <span className="font-semibold">{userAircraft.length}</span>
-          {activeAircraft.length > 0 && (
-            <span className="ml-4">Active: <span className="font-semibold text-green-600">{activeAircraft.length}</span></span>
+          {aircraftByAirline.length > 0 && (
+            <span className="ml-4">
+              Airlines: <span className="font-semibold text-blue-600">{aircraftByAirline.filter(g => g.airline !== 'Unassigned').length}</span>
+            </span>
           )}
         </div>
       </div>
@@ -55,14 +79,17 @@ export default function AircraftView({
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Active Aircraft */}
-          {activeAircraft.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="bg-green-600 text-white px-4 py-3">
-                <h2 className="text-lg font-semibold">Active Aircraft</h2>
+          {aircraftByAirline.map(({ airline, aircraft }) => (
+            <div key={airline} className="bg-white rounded-lg shadow-sm overflow-hidden">
+              <div className={`px-4 py-3 ${airline === 'Unassigned' ? 'bg-gray-500' : 'bg-blue-600'} text-white`}>
+                <div className="flex items-center gap-2">
+                  <Building2 size={20} />
+                  <h2 className="text-lg font-semibold">{airline}</h2>
+                  <span className="text-sm opacity-90">({aircraft.length} aircraft)</span>
+                </div>
               </div>
               <div className="divide-y divide-gray-200">
-                {activeAircraft.map(aircraft => {
+                {aircraft.map(aircraft => {
                   const typeInfo = getAircraftTypeInfo(aircraft.aircraft_type_id);
                   const engineInfo = getEngineInfo(aircraft.engine_id);
                   return (
@@ -71,38 +98,25 @@ export default function AircraftView({
                         <div className="flex-1">
                           <div className="flex items-center gap-3 mb-2">
                             <h3 className="text-xl font-bold text-gray-800">{aircraft.registration}</h3>
-                            <span className="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded">
-                              Active
-                            </span>
                           </div>
 
                           {typeInfo && (
-                            <div className="mb-2">
-                              <p className="text-lg text-gray-700 font-medium">
-                                {typeInfo.type_code}
+                            <div className="mb-1">
+                              <p className="text-gray-700">
+                                <span className="font-medium">{typeInfo.type_code}</span>
+                                {typeInfo.manufacturer && typeInfo.model && (
+                                  <span className="text-gray-600 ml-2">
+                                    - {typeInfo.manufacturer} {typeInfo.model}
+                                  </span>
+                                )}
                               </p>
-                              {engineInfo && (
-                                <p className="text-sm text-gray-600">
-                                  Engine: {engineInfo.full_designation || `${engineInfo.manufacturer} ${engineInfo.model}${engineInfo.variant ? `-${engineInfo.variant}` : ''}`}
-                                </p>
-                              )}
                             </div>
                           )}
 
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-sm text-gray-600">
-                            {aircraft.manufacturer && (
-                              <p><span className="font-medium">Manufacturer:</span> {aircraft.manufacturer}</p>
-                            )}
-                            {aircraft.serial_number && (
-                              <p><span className="font-medium">MSN:</span> {aircraft.serial_number}</p>
-                            )}
-                            {aircraft.year_of_manufacture && (
-                              <p><span className="font-medium">Year:</span> {aircraft.year_of_manufacture}</p>
-                            )}
-                          </div>
-
-                          {aircraft.notes && (
-                            <p className="text-sm text-gray-500 italic mt-2">{aircraft.notes}</p>
+                          {engineInfo && (
+                            <p className="text-sm text-gray-600">
+                              Engine: {engineInfo.full_designation || `${engineInfo.manufacturer} ${engineInfo.model}`}
+                            </p>
                           )}
                         </div>
 
@@ -110,12 +124,14 @@ export default function AircraftView({
                           <button
                             onClick={() => onOpenAircraftModal(aircraft)}
                             className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                            title="Edit aircraft"
                           >
                             <Edit2 size={16} />
                           </button>
                           <button
                             onClick={() => onDeleteAircraft(aircraft.id)}
                             className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                            title="Delete aircraft"
                           >
                             <Trash2 size={16} />
                           </button>
@@ -126,68 +142,7 @@ export default function AircraftView({
                 })}
               </div>
             </div>
-          )}
-
-          {/* Inactive Aircraft */}
-          {inactiveAircraft.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-              <div className="bg-gray-500 text-white px-4 py-3">
-                <h2 className="text-lg font-semibold">Inactive Aircraft</h2>
-              </div>
-              <div className="divide-y divide-gray-200">
-                {inactiveAircraft.map(aircraft => {
-                  const typeInfo = getAircraftTypeInfo(aircraft.aircraft_type_id);
-                  const engineInfo = getEngineInfo(aircraft.engine_id);
-                  return (
-                    <div key={aircraft.id} className="p-4 hover:bg-gray-50 transition opacity-75">
-                      <div className="flex justify-between items-start">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-bold text-gray-700">{aircraft.registration}</h3>
-                            <span className="inline-block bg-gray-100 text-gray-600 text-xs px-2 py-1 rounded">
-                              Inactive
-                            </span>
-                          </div>
-
-                          {typeInfo && (
-                            <div className="mb-2">
-                              <p className="text-lg text-gray-600 font-medium">
-                                {typeInfo.type_code}
-                              </p>
-                              {engineInfo && (
-                                <p className="text-sm text-gray-500">
-                                  Engine: {engineInfo.full_designation || `${engineInfo.manufacturer} ${engineInfo.model}${engineInfo.variant ? `-${engineInfo.variant}` : ''}`}
-                                </p>
-                              )}
-                            </div>
-                          )}
-
-                          {aircraft.notes && (
-                            <p className="text-sm text-gray-500 italic mt-2">{aircraft.notes}</p>
-                          )}
-                        </div>
-
-                        <div className="flex gap-2 ml-4">
-                          <button
-                            onClick={() => onOpenAircraftModal(aircraft)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => onDeleteAircraft(aircraft.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+          ))}
         </div>
       )}
     </>
