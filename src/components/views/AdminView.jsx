@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { Shield, Wrench, Link, LayoutDashboard, Users } from 'lucide-react';
+import { Shield, Wrench, Link, LayoutDashboard, Users, Plane } from 'lucide-react';
 import AdminDashboard from '../admin/AdminDashboard';
 import EngineManagementPanel from '../admin/EngineManagementPanel';
+import AircraftTypeManagementPanel from '../admin/AircraftTypeManagementPanel';
 import AircraftEngineLinksPanel from '../admin/AircraftEngineLinksPanel';
 import UserManagementPanel from '../admin/UserManagementPanel';
 
@@ -17,6 +18,7 @@ export default function AdminView({
   const tabs = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'users', label: 'Users', icon: Users },
+    { id: 'aircraft-types', label: 'Aircraft Types', icon: Plane },
     { id: 'engines', label: 'Engines', icon: Wrench },
     { id: 'links', label: 'Aircraft-Engine Links', icon: Link }
   ];
@@ -71,6 +73,13 @@ export default function AdminView({
           {activeTab === 'users' && (
             <UserManagementPanel
               currentUserId={currentUserId}
+            />
+          )}
+
+          {activeTab === 'aircraft-types' && (
+            <AircraftTypeManagementPanel
+              aircraftTypes={aircraftTypes}
+              onReloadData={onReloadData}
             />
           )}
 

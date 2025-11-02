@@ -1,0 +1,205 @@
+import React, { useState } from 'react';
+import { Plus, Edit2, Trash2, Plane, AlertCircle } from 'lucide-react';
+import AircraftTypeModal from '../modals/AircraftTypeModal';
+import { supabase } from '../../lib/supabaseClient';
+
+export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadData }) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingType, setEditingType] = useState(null);
+  const [formData, setFormData] = useState({
+    type_code: '',
+    type_name: '',
+    manufacturer: ''
+  });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const openModal = (type = null) => {
+    if (type) {
+      setEditingType(type);
+      setFormData({
+        type_code: type.type_code,
+        type_name: type.type_name || '',
+        manufacturer: type.manufacturer || ''
+      });
+    } else {
+      setEditingType(null);
+      setFormData({
+        type_code: '',
+        type_name: '',
+        manufacturer: ''
+      });
+    }
+    setError('');
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingType(null);
+    setError('');
+  };
+
+  const handleSubmit = async () => {
+    if (!formData.type_code) {
+      setError('Type code is required');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+
+    try {
+      if (editingType) {
+        // Update existing aircraft type
+        const { error: updateError } = await supabase
+          .from('aircraft_types')
+          .update({
+            type_code: formData.type_code.toUpperCase(),
+            type_name: formData.type_name || null,
+            manufacturer: formData.manufacturer || null
+          })
+          .eq('id', editingType.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Insert new aircraft type
+        const { error: insertError } = await supabase
+          .from('aircraft_types')
+          .insert([{
+            type_code: formData.type_code.toUpperCase(),
+            type_name: formData.type_name || null,
+            manufacturer: formData.manufacturer || null
+          }]);
+
+        if (insertError) throw insertError;
+      }
+
+      await onReloadData();
+      closeModal();
+    } catch (err) {
+      console.error('Error saving aircraft type:', err);
+      setError(err.message || 'Failed to save aircraft type');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async (typeId) => {
+    if (!confirm('Are you sure you want to delete this aircraft type? This will affect any aircraft using this type.')) {
+      return;
+    }
+
+    try {
+      const { error: deleteError } = await supabase
+        .from('aircraft_types')
+        .delete()
+        .eq('id', typeId);
+
+      if (deleteError) throw deleteError;
+
+      await onReloadData();
+    } catch (err) {
+      console.error('Error deleting aircraft type:', err);
+      alert('Failed to delete aircraft type: ' + err.message);
+    }
+  };
+
+  // Group aircraft types by manufacturer
+  const typesByManufacturer = aircraftTypes.reduce((acc, type) => {
+    const mfr = type.manufacturer || 'Other';
+    if (!acc[mfr]) {
+      acc[mfr] = [];
+    }
+    acc[mfr].push(type);
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <div className="mb-4 flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-semibold text-gray-800">Aircraft Types Database</h2>
+          <p className="text-sm text-gray-600">Manage all available aircraft types</p>
+        </div>
+        <button
+          onClick={() => openModal()}
+          className="flex items-center gap-2 bg-purple-600 text-white px-4 py-2 rounded-md hover:bg-purple-700 transition"
+        >
+          <Plus size={20} />
+          Add Aircraft Type
+        </button>
+      </div>
+
+      {aircraftTypes.length === 0 ? (
+        <div className="bg-gray-50 rounded-lg p-12 text-center">
+          <Plane size={48} className="mx-auto text-gray-400 mb-3" />
+          <h3 className="text-lg font-semibold text-gray-700 mb-2">No aircraft types yet</h3>
+          <p className="text-gray-600 mb-4">Add your first aircraft type to get started</p>
+          <button
+            onClick={() => openModal()}
+            className="bg-purple-600 text-white px-6 py-2 rounded-md hover:bg-purple-700 transition"
+          >
+            Add Aircraft Type
+          </button>
+        </div>
+      ) : (
+        <div className="space-y-6">
+          {Object.entries(typesByManufacturer)
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([manufacturer, manufacturerTypes]) => (
+              <div key={manufacturer} className="border border-gray-200 rounded-lg overflow-hidden">
+                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
+                  <h3 className="font-semibold text-gray-800">{manufacturer}</h3>
+                  <p className="text-xs text-gray-500">{manufacturerTypes.length} aircraft type{manufacturerTypes.length !== 1 ? 's' : ''}</p>
+                </div>
+                <div className="divide-y divide-gray-200">
+                  {manufacturerTypes
+                    .sort((a, b) => a.type_code.localeCompare(b.type_code))
+                    .map(type => (
+                      <div key={type.id} className="p-4 hover:bg-gray-50 transition flex justify-between items-center">
+                        <div>
+                          <p className="font-medium text-gray-800">
+                            {type.type_code}
+                          </p>
+                          <p className="text-sm text-gray-500">
+                            {type.type_name || 'No description'}
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => openModal(type)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                            title="Edit aircraft type"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(type.id)}
+                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                            title="Delete aircraft type"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            ))}
+        </div>
+      )}
+
+      <AircraftTypeModal
+        isOpen={isModalOpen}
+        onClose={closeModal}
+        formData={formData}
+        setFormData={setFormData}
+        onSubmit={handleSubmit}
+        editingType={editingType}
+        loading={loading}
+        error={error}
+      />
+    </>
+  );
+}
