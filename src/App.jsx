@@ -93,6 +93,10 @@ export default function AviationLogbook() {
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
   const [hasUnsavedProfileChanges, setHasUnsavedProfileChanges] = useState(false);
 
+  // Getting started flow state
+  const [showGettingStartedModal, setShowGettingStartedModal] = useState(false);
+  const [gettingStartedStep, setGettingStartedStep] = useState('welcome'); // welcome, aircraft, supervisor, complete
+
   // Check for invite parameter in URL
   React.useEffect(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -251,6 +255,37 @@ export default function AviationLogbook() {
       }
     }
   }, [user, profile, addresses, dataLoading]);
+
+  // Check for getting started flow - if profile is complete but no aircraft or supervisors
+  React.useEffect(() => {
+    if (user && profile && !dataLoading && !showProfileCompletionModal) {
+      const isProfileComplete =
+        profile.title &&
+        profile.forename &&
+        profile.surname &&
+        profile.date_of_birth &&
+        profile.nationality &&
+        addresses?.some(addr => addr.is_current);
+
+      if (isProfileComplete) {
+        const hasAircraft = userAircraft?.length > 0;
+        const hasSupervisors = supervisors?.length > 0;
+
+        // Only show getting started if they haven't completed it yet
+        if (!hasAircraft || !hasSupervisors) {
+          setShowGettingStartedModal(true);
+          setCurrentView('dashboard');
+
+          // Determine which step to show
+          if (!hasAircraft) {
+            setGettingStartedStep('aircraft');
+          } else if (!hasSupervisors) {
+            setGettingStartedStep('supervisor');
+          }
+        }
+      }
+    }
+  }, [user, profile, addresses, userAircraft, supervisors, dataLoading, showProfileCompletionModal]);
 
   // Auth handlers
   const handleLogin = async () => {
@@ -670,6 +705,10 @@ export default function AviationLogbook() {
   };
 
   const handleCloseAircraftModal = () => {
+    // Don't allow closing during getting started flow
+    if (showGettingStartedModal && gettingStartedStep === 'aircraft') {
+      return;
+    }
     setShowAircraftModal(false);
     setEditingAircraft(null);
     setError('');
@@ -716,6 +755,15 @@ export default function AviationLogbook() {
 
       await reloadData();
       handleCloseAircraftModal();
+
+      // If in getting started flow, advance to next step
+      if (showGettingStartedModal && gettingStartedStep === 'aircraft') {
+        setGettingStartedStep('supervisor');
+        // Open supervisor modal after a short delay
+        setTimeout(() => {
+          handleOpenSupervisorModal();
+        }, 500);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -750,6 +798,15 @@ export default function AviationLogbook() {
 
   // Entry handlers
   const handleOpenEntryModal = (entry = null) => {
+    // Check if getting started flow is complete
+    const hasAircraft = userAircraft?.length > 0;
+    const hasSupervisors = supervisors?.length > 0;
+
+    if (!hasAircraft || !hasSupervisors) {
+      setError('Please complete the getting started flow by adding at least one aircraft and supervisor before creating logbook entries.');
+      return;
+    }
+
     if (entry) {
       setFormData({
         entry_date: entry.entry_date,
@@ -863,6 +920,10 @@ export default function AviationLogbook() {
   };
 
   const handleCloseSupervisorModal = () => {
+    // Don't allow closing during getting started flow
+    if (showGettingStartedModal && gettingStartedStep === 'supervisor') {
+      return;
+    }
     closeSupervisorModal();
     setError('');
   };
@@ -901,6 +962,15 @@ export default function AviationLogbook() {
 
       await reloadData();
       handleCloseSupervisorModal();
+
+      // If in getting started flow, complete the flow
+      if (showGettingStartedModal && gettingStartedStep === 'supervisor') {
+        setGettingStartedStep('complete');
+        setTimeout(() => {
+          setShowGettingStartedModal(false);
+          setSuccess('Great! You\'re all set up. You can now start adding logbook entries!');
+        }, 500);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -1401,6 +1471,69 @@ export default function AviationLogbook() {
               >
                 {loading ? 'Saving...' : 'Save & Continue'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Getting Started Flow Modal */}
+      {showGettingStartedModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
+            <div className="p-6 border-b border-gray-200 bg-blue-50">
+              <h2 className="text-2xl font-bold text-blue-900">Getting Started</h2>
+              <p className="text-blue-700 mt-2">
+                {gettingStartedStep === 'aircraft'
+                  ? 'First, let\'s add an aircraft that you work on.'
+                  : 'Now, let\'s add a supervisor who will sign off your work.'}
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4">
+                <h3 className="font-semibold text-yellow-900 mb-2">Setup Progress:</h3>
+                <ul className="space-y-2 text-sm text-yellow-800">
+                  <li className="flex items-center gap-2">
+                    <span className={userAircraft?.length > 0 ? "text-green-600" : gettingStartedStep === 'aircraft' ? "text-blue-600" : "text-gray-600"}>
+                      {userAircraft?.length > 0 ? "✓" : gettingStartedStep === 'aircraft' ? "→" : "○"}
+                    </span>
+                    Add at least one aircraft
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className={supervisors?.length > 0 ? "text-green-600" : gettingStartedStep === 'supervisor' ? "text-blue-600" : "text-gray-600"}>
+                      {supervisors?.length > 0 ? "✓" : gettingStartedStep === 'supervisor' ? "→" : "○"}
+                    </span>
+                    Add at least one supervisor
+                  </li>
+                </ul>
+              </div>
+
+              {gettingStartedStep === 'aircraft' ? (
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    Aircraft are the vehicles you perform maintenance work on. You'll need at least one aircraft
+                    before you can start logging your work.
+                  </p>
+                  <button
+                    onClick={() => handleOpenAircraftModal()}
+                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
+                  >
+                    Add Your First Aircraft
+                  </button>
+                </div>
+              ) : gettingStartedStep === 'supervisor' ? (
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    Supervisors are qualified personnel who review and sign off your maintenance work.
+                    You'll need at least one supervisor before you can create logbook entries.
+                  </p>
+                  <button
+                    onClick={() => handleOpenSupervisorModal()}
+                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
+                  >
+                    Add Your First Supervisor
+                  </button>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
