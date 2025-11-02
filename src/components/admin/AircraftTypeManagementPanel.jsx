@@ -86,11 +86,34 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
   };
 
   const handleDelete = async (typeId) => {
-    if (!confirm('Are you sure you want to delete this aircraft type? This will affect any aircraft using this type.')) {
-      return;
-    }
-
     try {
+      // First check if any aircraft are using this type
+      const { count: aircraftCount, error: countError } = await supabase
+        .from('user_aircraft')
+        .select('*', { count: 'exact', head: true })
+        .eq('aircraft_type_id', typeId);
+
+      if (countError) throw countError;
+
+      // Also check if any aircraft-engine links use this type
+      const { count: linkCount, error: linkCountError } = await supabase
+        .from('aircraft_type_engines')
+        .select('*', { count: 'exact', head: true })
+        .eq('aircraft_type_id', typeId);
+
+      if (linkCountError) throw linkCountError;
+
+      const totalUsage = (aircraftCount || 0) + (linkCount || 0);
+
+      if (totalUsage > 0) {
+        alert(`Cannot delete this aircraft type. It is currently being used by ${totalUsage} item(s). Please remove those references first.`);
+        return;
+      }
+
+      if (!confirm('Are you sure you want to delete this aircraft type?')) {
+        return;
+      }
+
       const { error: deleteError } = await supabase
         .from('aircraft_types')
         .delete()
@@ -99,6 +122,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       if (deleteError) throw deleteError;
 
       await onReloadData();
+      alert('Aircraft type deleted successfully');
     } catch (err) {
       console.error('Error deleting aircraft type:', err);
       alert('Failed to delete aircraft type: ' + err.message);
