@@ -91,6 +91,7 @@ export default function AviationLogbook() {
 
   // Profile completion state
   const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
+  const [hasUnsavedProfileChanges, setHasUnsavedProfileChanges] = useState(false);
 
   // Check for invite parameter in URL
   React.useEffect(() => {
@@ -173,7 +174,7 @@ export default function AviationLogbook() {
 
   // Update profile form data when profile loads (but not addresses)
   React.useEffect(() => {
-    if (profile) {
+    if (profile && !hasUnsavedProfileChanges) {
       setProfileFormData(prev => ({
         ...prev,
         title: profile.title || '',
@@ -184,7 +185,7 @@ export default function AviationLogbook() {
         licence_number: profile.licence_number || ''
       }));
     }
-  }, [profile]);
+  }, [profile, hasUnsavedProfileChanges]);
 
   // Update address fields separately when addresses change
   React.useEffect(() => {
@@ -396,6 +397,7 @@ export default function AviationLogbook() {
 
       if (error) throw error;
       setSuccess('Profile updated successfully!');
+      setHasUnsavedProfileChanges(false); // Clear unsaved changes flag
       await reloadData();
 
       // Check if profile is now complete and close the completion modal if it is
@@ -1205,7 +1207,10 @@ export default function AviationLogbook() {
                     </label>
                     <select
                       value={profileFormData.title || ''}
-                      onChange={(e) => setProfileFormData({...profileFormData, title: e.target.value})}
+                      onChange={(e) => {
+                        setProfileFormData({...profileFormData, title: e.target.value});
+                        setHasUnsavedProfileChanges(true);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     >
@@ -1226,7 +1231,10 @@ export default function AviationLogbook() {
                     <input
                       type="text"
                       value={profileFormData.forename || ''}
-                      onChange={(e) => setProfileFormData({...profileFormData, forename: e.target.value})}
+                      onChange={(e) => {
+                        setProfileFormData({...profileFormData, forename: e.target.value});
+                        setHasUnsavedProfileChanges(true);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="John"
                       required
@@ -1239,7 +1247,10 @@ export default function AviationLogbook() {
                     <input
                       type="text"
                       value={profileFormData.surname || ''}
-                      onChange={(e) => setProfileFormData({...profileFormData, surname: e.target.value})}
+                      onChange={(e) => {
+                        setProfileFormData({...profileFormData, surname: e.target.value});
+                        setHasUnsavedProfileChanges(true);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Smith"
                       required
@@ -1254,7 +1265,10 @@ export default function AviationLogbook() {
                     <input
                       type="date"
                       value={profileFormData.date_of_birth || ''}
-                      onChange={(e) => setProfileFormData({...profileFormData, date_of_birth: e.target.value})}
+                      onChange={(e) => {
+                        setProfileFormData({...profileFormData, date_of_birth: e.target.value});
+                        setHasUnsavedProfileChanges(true);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
                     />
@@ -1264,13 +1278,14 @@ export default function AviationLogbook() {
                       Nationality <span className="text-red-500">*</span>
                     </label>
                     <select
-                      value={profileFormData.nationality && ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish', ''].includes(profileFormData.nationality) ? profileFormData.nationality : 'Other'}
+                      value={!profileFormData.nationality || profileFormData.nationality === '' ? '' : ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish'].includes(profileFormData.nationality) ? profileFormData.nationality : 'Other'}
                       onChange={(e) => {
                         if (e.target.value === 'Other') {
                           setProfileFormData({...profileFormData, nationality: 'Other_Custom'});
                         } else {
                           setProfileFormData({...profileFormData, nationality: e.target.value});
                         }
+                        setHasUnsavedProfileChanges(true);
                       }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       required
@@ -1303,7 +1318,10 @@ export default function AviationLogbook() {
                     <input
                       type="text"
                       value={profileFormData.nationality === 'Other_Custom' ? '' : profileFormData.nationality}
-                      onChange={(e) => setProfileFormData({...profileFormData, nationality: e.target.value})}
+                      onChange={(e) => {
+                        setProfileFormData({...profileFormData, nationality: e.target.value});
+                        setHasUnsavedProfileChanges(true);
+                      }}
                       className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="Enter your nationality"
                       required

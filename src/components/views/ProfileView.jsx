@@ -84,7 +84,7 @@ export default function ProfileView({
                 Nationality <span className="text-red-500">*</span>
               </label>
               <select
-                value={profileFormData.nationality && ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish', ''].includes(profileFormData.nationality) ? profileFormData.nationality : 'Other'}
+                value={!profileFormData.nationality || profileFormData.nationality === '' ? '' : ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish'].includes(profileFormData.nationality) ? profileFormData.nationality : 'Other'}
                 onChange={(e) => {
                   if (e.target.value === 'Other') {
                     setProfileFormData({...profileFormData, nationality: 'Other_Custom'});
