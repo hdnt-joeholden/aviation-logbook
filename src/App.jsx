@@ -256,7 +256,7 @@ export default function AviationLogbook() {
     }
   }, [user, profile, addresses, dataLoading]);
 
-  // Check for getting started flow - if profile is complete but no aircraft, employment, or supervisors
+  // Check for getting started flow - if profile is complete but no employment, aircraft, or supervisors
   React.useEffect(() => {
     if (user && profile && !dataLoading && !showProfileCompletionModal) {
       const isProfileComplete =
@@ -268,20 +268,20 @@ export default function AviationLogbook() {
         addresses?.some(addr => addr.is_current);
 
       if (isProfileComplete) {
-        const hasAircraft = userAircraft?.length > 0;
         const hasEmployment = employmentHistory?.length > 0;
+        const hasAircraft = userAircraft?.length > 0;
         const hasSupervisors = supervisors?.length > 0;
 
         // Only show getting started if they haven't completed it yet
-        if (!hasAircraft || !hasEmployment || !hasSupervisors) {
+        if (!hasEmployment || !hasAircraft || !hasSupervisors) {
           setShowGettingStartedModal(true);
           setCurrentView('dashboard');
 
-          // Determine which step to show
-          if (!hasAircraft) {
-            setGettingStartedStep('aircraft');
-          } else if (!hasEmployment) {
+          // Determine which step to show - employment first
+          if (!hasEmployment) {
             setGettingStartedStep('employment');
+          } else if (!hasAircraft) {
+            setGettingStartedStep('aircraft');
           } else if (!hasSupervisors) {
             setGettingStartedStep('supervisor');
           }
@@ -650,9 +650,9 @@ export default function AviationLogbook() {
       await reloadData();
       handleCloseEmploymentModal();
 
-      // If in getting started flow, advance to supervisor step
+      // If in getting started flow, advance to aircraft step
       if (showGettingStartedModal && gettingStartedStep === 'employment') {
-        setGettingStartedStep('supervisor');
+        setGettingStartedStep('aircraft');
       }
     } catch (err) {
       setError(err.message);
@@ -768,9 +768,9 @@ export default function AviationLogbook() {
       await reloadData();
       handleCloseAircraftModal();
 
-      // If in getting started flow, advance to employment step
+      // If in getting started flow, advance to supervisor step
       if (showGettingStartedModal && gettingStartedStep === 'aircraft') {
-        setGettingStartedStep('employment');
+        setGettingStartedStep('supervisor');
       }
     } catch (err) {
       setError(err.message);
@@ -1500,10 +1500,10 @@ export default function AviationLogbook() {
                 {gettingStartedStep === 'complete' ? 'Setup Complete!' : 'Getting Started'}
               </h2>
               <p className="text-blue-700 mt-2">
-                {gettingStartedStep === 'aircraft'
-                  ? 'First, let\'s add an aircraft that you work on.'
-                  : gettingStartedStep === 'employment'
-                  ? 'Next, let\'s add your current employment information.'
+                {gettingStartedStep === 'employment'
+                  ? 'First, let\'s add your current employment information.'
+                  : gettingStartedStep === 'aircraft'
+                  ? 'Next, let\'s add an aircraft that you work on.'
                   : gettingStartedStep === 'supervisor'
                   ? 'Finally, let\'s add a supervisor who will sign off your work.'
                   : 'You\'re ready to make your first logbook entry!'}
@@ -1515,16 +1515,16 @@ export default function AviationLogbook() {
                   <h3 className="font-semibold text-yellow-900 mb-2">Setup Progress:</h3>
                   <ul className="space-y-2 text-sm text-yellow-800">
                     <li className="flex items-center gap-2">
-                      <span className={userAircraft?.length > 0 ? "text-green-600" : gettingStartedStep === 'aircraft' ? "text-blue-600" : "text-gray-600"}>
-                        {userAircraft?.length > 0 ? "✓" : gettingStartedStep === 'aircraft' ? "→" : "○"}
-                      </span>
-                      Add at least one aircraft
-                    </li>
-                    <li className="flex items-center gap-2">
                       <span className={employmentHistory?.length > 0 ? "text-green-600" : gettingStartedStep === 'employment' ? "text-blue-600" : "text-gray-600"}>
                         {employmentHistory?.length > 0 ? "✓" : gettingStartedStep === 'employment' ? "→" : "○"}
                       </span>
                       Add your employment history
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className={userAircraft?.length > 0 ? "text-green-600" : gettingStartedStep === 'aircraft' ? "text-blue-600" : "text-gray-600"}>
+                        {userAircraft?.length > 0 ? "✓" : gettingStartedStep === 'aircraft' ? "→" : "○"}
+                      </span>
+                      Add at least one aircraft
                     </li>
                     <li className="flex items-center gap-2">
                       <span className={supervisors?.length > 0 ? "text-green-600" : gettingStartedStep === 'supervisor' ? "text-blue-600" : "text-gray-600"}>
@@ -1536,20 +1536,7 @@ export default function AviationLogbook() {
                 </div>
               )}
 
-              {gettingStartedStep === 'aircraft' ? (
-                <div className="space-y-4">
-                  <p className="text-gray-700">
-                    Aircraft are the vehicles you perform maintenance work on. You'll need at least one aircraft
-                    before you can start logging your work.
-                  </p>
-                  <button
-                    onClick={() => handleOpenAircraftModal()}
-                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
-                  >
-                    Add Your First Aircraft
-                  </button>
-                </div>
-              ) : gettingStartedStep === 'employment' ? (
+              {gettingStartedStep === 'employment' ? (
                 <div className="space-y-4">
                   <p className="text-gray-700">
                     Employment history helps track where you've worked and will be used to pre-populate
@@ -1560,6 +1547,19 @@ export default function AviationLogbook() {
                     className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
                   >
                     Add Employment History
+                  </button>
+                </div>
+              ) : gettingStartedStep === 'aircraft' ? (
+                <div className="space-y-4">
+                  <p className="text-gray-700">
+                    Aircraft are the vehicles you perform maintenance work on. You'll need at least one aircraft
+                    before you can start logging your work.
+                  </p>
+                  <button
+                    onClick={() => handleOpenAircraftModal()}
+                    className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
+                  >
+                    Add Your First Aircraft
                   </button>
                 </div>
               ) : gettingStartedStep === 'supervisor' ? (
