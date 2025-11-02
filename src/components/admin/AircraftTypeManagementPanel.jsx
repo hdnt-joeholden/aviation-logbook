@@ -93,7 +93,10 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         .select('*', { count: 'exact', head: true })
         .eq('aircraft_type_id', typeId);
 
-      if (countError) throw countError;
+      if (countError) {
+        console.error('Error checking aircraft count:', countError);
+        throw countError;
+      }
 
       // Also check if any aircraft-engine links use this type
       const { count: linkCount, error: linkCountError } = await supabase
@@ -101,7 +104,12 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         .select('*', { count: 'exact', head: true })
         .eq('aircraft_type_id', typeId);
 
-      if (linkCountError) throw linkCountError;
+      if (linkCountError) {
+        console.error('Error checking link count:', linkCountError);
+        throw linkCountError;
+      }
+
+      console.log('Usage check:', { aircraftCount, linkCount, typeId });
 
       const totalUsage = (aircraftCount || 0) + (linkCount || 0);
 
@@ -114,14 +122,22 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         return;
       }
 
-      const { error: deleteError } = await supabase
+      console.log('Attempting to delete aircraft type:', typeId);
+
+      const { data: deleteData, error: deleteError } = await supabase
         .from('aircraft_types')
         .delete()
-        .eq('id', typeId);
+        .eq('id', typeId)
+        .select();
+
+      console.log('Delete result:', { deleteData, deleteError });
 
       if (deleteError) throw deleteError;
 
+      console.log('Reloading data...');
       await onReloadData();
+      console.log('Data reloaded');
+
       alert('Aircraft type deleted successfully');
     } catch (err) {
       console.error('Error deleting aircraft type:', err);
