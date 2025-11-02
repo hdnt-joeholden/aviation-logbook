@@ -58,20 +58,20 @@ export default function SupervisorModal({
               value={formData.license_number || ''}
               onChange={(e) => setFormData({...formData, license_number: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., LIC123456"
+              placeholder="e.g., UK.66.12345"
             />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Approval Number <span className="text-red-500">*</span>
+              Approval/Stamp Number <span className="text-red-500">*</span>
             </label>
             <input
               type="text"
               value={formData.approval_number}
               onChange={(e) => setFormData({...formData, approval_number: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="e.g., UK.145.12345"
+              placeholder="e.g., VS123"
             />
           </div>
 
