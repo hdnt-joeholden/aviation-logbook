@@ -19,11 +19,13 @@ export default function AircraftModal({
   const [customAirline, setCustomAirline] = useState('');
 
   // Get unique airlines from employment history
-  const existingAirlines = employmentHistory
-    ? [...new Set(employmentHistory
-        .map(e => e.company_name)
-        .filter(c => c && c.trim() !== ''))].sort()
-    : [];
+  const existingAirlines = useMemo(() => {
+    return employmentHistory
+      ? [...new Set(employmentHistory
+          .map(e => e.company_name)
+          .filter(c => c && c.trim() !== ''))].sort()
+      : [];
+  }, [employmentHistory]);
 
   // Check if current airline is custom (not in the list)
   useEffect(() => {
@@ -34,7 +36,7 @@ export default function AircraftModal({
       setShowCustomAirline(false);
       setCustomAirline('');
     }
-  }, [formData.airline, isOpen]);
+  }, [formData.airline, existingAirlines, isOpen]);
 
   const handleAirlineChange = (value) => {
     if (value === '__custom__') {
