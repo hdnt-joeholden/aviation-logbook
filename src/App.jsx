@@ -653,10 +653,6 @@ export default function AviationLogbook() {
       // If in getting started flow, advance to supervisor step
       if (showGettingStartedModal && gettingStartedStep === 'employment') {
         setGettingStartedStep('supervisor');
-        // Pre-populate supervisor company from the employment just added
-        setTimeout(() => {
-          handleOpenSupervisorModal(null, employmentFormData.company_name);
-        }, 500);
       }
     } catch (err) {
       setError(err.message);
@@ -913,7 +909,7 @@ export default function AviationLogbook() {
   };
 
   // Supervisor handlers
-  const handleOpenSupervisorModal = (supervisor = null, prePopulateCompany = null) => {
+  const handleOpenSupervisorModal = (supervisor = null) => {
     if (supervisor) {
       setSupervisorFormData({
         name: supervisor.name,
@@ -922,11 +918,12 @@ export default function AviationLogbook() {
         company: supervisor.company
       });
     } else {
+      // Default to empty - user will select from dropdown of employment companies
       setSupervisorFormData({
         name: '',
         license_number: '',
         approval_number: '',
-        company: prePopulateCompany || ''
+        company: ''
       });
     }
     openSupervisorModal(supervisor);
@@ -943,7 +940,10 @@ export default function AviationLogbook() {
 
   const handleSubmitSupervisor = async () => {
     try {
-      if (!supervisorFormData.name || !supervisorFormData.license_number || !supervisorFormData.approval_number || !supervisorFormData.company) {
+      // Use company_manual if "Other" was selected, otherwise use company
+      const finalCompany = supervisorFormData.company === '__other__' ? supervisorFormData.company_manual : supervisorFormData.company;
+
+      if (!supervisorFormData.name || !supervisorFormData.license_number || !supervisorFormData.approval_number || !finalCompany) {
         setError('Please fill in all required fields');
         return;
       }
@@ -952,7 +952,10 @@ export default function AviationLogbook() {
       setLoading(true);
 
       const supervisorData = {
-        ...supervisorFormData,
+        name: supervisorFormData.name,
+        license_number: supervisorFormData.license_number,
+        approval_number: supervisorFormData.approval_number,
+        company: finalCompany,
         user_id: user.id
       };
 

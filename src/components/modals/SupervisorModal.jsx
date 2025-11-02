@@ -15,7 +15,7 @@ export default function SupervisorModal({
   if (!isOpen) return null;
 
   // Get unique companies from employment history
-  const companies = [...new Set(employmentHistory.map(emp => emp.company))].filter(Boolean);
+  const companies = [...new Set((employmentHistory || []).map(emp => emp.company_name))].filter(Boolean);
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -106,9 +106,10 @@ export default function SupervisorModal({
               <input
                 type="text"
                 value={formData.company_manual || ''}
-                onChange={(e) => setFormData({...formData, company: e.target.value, company_manual: e.target.value})}
+                onChange={(e) => setFormData({...formData, company_manual: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 mt-2"
                 placeholder="Enter company name"
+                autoFocus
               />
             )}
           </div>
