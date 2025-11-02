@@ -979,13 +979,9 @@ export default function AviationLogbook() {
       await reloadData();
       handleCloseSupervisorModal();
 
-      // If in getting started flow, complete the flow
+      // If in getting started flow, show completion screen
       if (showGettingStartedModal && gettingStartedStep === 'supervisor') {
         setGettingStartedStep('complete');
-        setTimeout(() => {
-          setShowGettingStartedModal(false);
-          setSuccess('Great! You\'re all set up. You can now start adding logbook entries!');
-        }, 500);
       }
     } catch (err) {
       setError(err.message);
@@ -1497,39 +1493,45 @@ export default function AviationLogbook() {
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
             <div className="p-6 border-b border-gray-200 bg-blue-50">
-              <h2 className="text-2xl font-bold text-blue-900">Getting Started</h2>
+              <h2 className="text-2xl font-bold text-blue-900">
+                {gettingStartedStep === 'complete' ? 'Setup Complete!' : 'Getting Started'}
+              </h2>
               <p className="text-blue-700 mt-2">
                 {gettingStartedStep === 'aircraft'
                   ? 'First, let\'s add an aircraft that you work on.'
                   : gettingStartedStep === 'employment'
                   ? 'Next, let\'s add your current employment information.'
-                  : 'Finally, let\'s add a supervisor who will sign off your work.'}
+                  : gettingStartedStep === 'supervisor'
+                  ? 'Finally, let\'s add a supervisor who will sign off your work.'
+                  : 'You\'re ready to make your first logbook entry!'}
               </p>
             </div>
             <div className="p-6">
-              <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4">
-                <h3 className="font-semibold text-yellow-900 mb-2">Setup Progress:</h3>
-                <ul className="space-y-2 text-sm text-yellow-800">
-                  <li className="flex items-center gap-2">
-                    <span className={userAircraft?.length > 0 ? "text-green-600" : gettingStartedStep === 'aircraft' ? "text-blue-600" : "text-gray-600"}>
-                      {userAircraft?.length > 0 ? "✓" : gettingStartedStep === 'aircraft' ? "→" : "○"}
-                    </span>
-                    Add at least one aircraft
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className={employmentHistory?.length > 0 ? "text-green-600" : gettingStartedStep === 'employment' ? "text-blue-600" : "text-gray-600"}>
-                      {employmentHistory?.length > 0 ? "✓" : gettingStartedStep === 'employment' ? "→" : "○"}
-                    </span>
-                    Add your employment history
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <span className={supervisors?.length > 0 ? "text-green-600" : gettingStartedStep === 'supervisor' ? "text-blue-600" : "text-gray-600"}>
-                      {supervisors?.length > 0 ? "✓" : gettingStartedStep === 'supervisor' ? "→" : "○"}
-                    </span>
-                    Add at least one supervisor
-                  </li>
-                </ul>
-              </div>
+              {gettingStartedStep !== 'complete' && (
+                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-md mb-4">
+                  <h3 className="font-semibold text-yellow-900 mb-2">Setup Progress:</h3>
+                  <ul className="space-y-2 text-sm text-yellow-800">
+                    <li className="flex items-center gap-2">
+                      <span className={userAircraft?.length > 0 ? "text-green-600" : gettingStartedStep === 'aircraft' ? "text-blue-600" : "text-gray-600"}>
+                        {userAircraft?.length > 0 ? "✓" : gettingStartedStep === 'aircraft' ? "→" : "○"}
+                      </span>
+                      Add at least one aircraft
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className={employmentHistory?.length > 0 ? "text-green-600" : gettingStartedStep === 'employment' ? "text-blue-600" : "text-gray-600"}>
+                        {employmentHistory?.length > 0 ? "✓" : gettingStartedStep === 'employment' ? "→" : "○"}
+                      </span>
+                      Add your employment history
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className={supervisors?.length > 0 ? "text-green-600" : gettingStartedStep === 'supervisor' ? "text-blue-600" : "text-gray-600"}>
+                        {supervisors?.length > 0 ? "✓" : gettingStartedStep === 'supervisor' ? "→" : "○"}
+                      </span>
+                      Add at least one supervisor
+                    </li>
+                  </ul>
+                </div>
+              )}
 
               {gettingStartedStep === 'aircraft' ? (
                 <div className="space-y-4">
@@ -1568,6 +1570,27 @@ export default function AviationLogbook() {
                     className="w-full px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition font-medium"
                   >
                     Add Your First Supervisor
+                  </button>
+                </div>
+              ) : gettingStartedStep === 'complete' ? (
+                <div className="space-y-4">
+                  <div className="bg-green-50 border border-green-200 p-6 rounded-md text-center">
+                    <div className="text-green-600 text-5xl mb-4">✓</div>
+                    <h3 className="text-xl font-semibold text-green-900 mb-2">
+                      You're ready to make your first logbook entry!
+                    </h3>
+                    <p className="text-green-700 text-sm">
+                      You've completed all the required setup steps. You can now start logging your maintenance work.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShowGettingStartedModal(false);
+                      setCurrentView('logbook');
+                    }}
+                    className="w-full px-6 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 transition font-medium"
+                  >
+                    Go to Logbook
                   </button>
                 </div>
               ) : null}
