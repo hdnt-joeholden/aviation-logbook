@@ -75,30 +75,9 @@ export default function UserManagementPanel({ currentUserId }) {
         return;
       }
 
-      // Check if user already exists
-      const { data: existingUser } = await supabase
-        .from('profiles')
-        .select('email')
-        .eq('email', inviteForm.email.toLowerCase())
-        .single();
-
-      if (existingUser) {
-        setError('A user with this email already exists');
-        return;
-      }
-
-      // Check if there's a pending invite
-      const { data: existingInvite } = await supabase
-        .from('invites')
-        .select('*')
-        .eq('email', inviteForm.email.toLowerCase())
-        .eq('status', 'pending')
-        .single();
-
-      if (existingInvite) {
-        setError('An invite has already been sent to this email');
-        return;
-      }
+      // Note: We removed the duplicate checks because they were causing RLS issues
+      // The database will handle duplicates with its unique constraint on pending invites
+      // If there's a duplicate, we'll catch it in the error handler below
 
       // Create invite record
       const { error: inviteError } = await supabase
@@ -106,20 +85,52 @@ export default function UserManagementPanel({ currentUserId }) {
         .insert({
           email: inviteForm.email.toLowerCase(),
           full_name: inviteForm.full_name,
+          is_admin: inviteForm.is_admin,
           invited_by: currentUserId
         });
 
       if (inviteError) throw inviteError;
 
-      // TODO: Implement email sending via Supabase Edge Function or backend service
-      // For now, the admin will need to manually share the signup link
-      // The signup link should include the invite email as a parameter
-
+      // Generate signup URL
       const signupUrl = `${window.location.origin}/?invite=${encodeURIComponent(inviteForm.email.toLowerCase())}`;
 
-      setSuccess(
-        `Invite created for ${inviteForm.email}. Share this signup link with them: ${signupUrl}`
-      );
+      // Send invitation email via Edge Function (uses Supabase's email system)
+      try {
+        // Get current user's profile for the invited_by name
+        const { data: currentUserProfile } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('id', currentUserId)
+          .single();
+
+        const { data: functionData, error: functionError } = await supabase.functions.invoke('send-invite', {
+          body: {
+            email: inviteForm.email.toLowerCase(),
+            full_name: inviteForm.full_name,
+            signup_url: signupUrl,
+            invited_by_name: currentUserProfile?.full_name || 'An administrator'
+          }
+        });
+
+        if (functionError) {
+          console.error('Email function error:', functionError);
+          // Don't fail the whole operation if email fails
+          setSuccess(
+            `Invite created for ${inviteForm.email}. Email service unavailable - please share this link manually: ${signupUrl}`
+          );
+        } else {
+          // Email sent successfully using Supabase's auth email service
+          setSuccess(
+            `Invite sent to ${inviteForm.email}! They will receive an email with instructions. (Backup link: ${signupUrl})`
+          );
+        }
+      } catch (emailError) {
+        console.error('Failed to send invite email:', emailError);
+        // Provide fallback link
+        setSuccess(
+          `Invite created for ${inviteForm.email}. Share this signup link with them: ${signupUrl}`
+        );
+      }
 
       // Reset form and close modal
       setInviteForm({ email: '', full_name: '', is_admin: false });
@@ -132,30 +143,82 @@ export default function UserManagementPanel({ currentUserId }) {
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
       console.error('Error inviting user:', err);
-      setError(err.message || 'Failed to invite user');
+
+      // Check if it's a duplicate invite error
+      if (err.code === '23505' || err.message?.includes('duplicate') || err.message?.includes('unique')) {
+        setError('An invite has already been sent to this email. Cancel the existing invite first.');
+      } else {
+        setError(err.message || 'Failed to invite user');
+      }
     }
   };
 
   const cancelInvite = async (inviteId, email) => {
-    if (!confirm(`Cancel invite for ${email}?`)) {
+    if (!confirm(`Cancel invite for ${email}? This will remove the pending user.`)) {
       return;
     }
 
     try {
-      const { error } = await supabase
+      // Mark invite as expired
+      const { error: inviteError } = await supabase
         .from('invites')
         .update({ status: 'expired' })
         .eq('id', inviteId);
 
-      if (error) throw error;
+      if (inviteError) throw inviteError;
 
-      setSuccess('Invite cancelled');
+      // Also delete the pending ghost user if they exist
+      const { error: deleteError } = await supabase
+        .from('profiles')
+        .delete()
+        .eq('email', email)
+        .eq('account_status', 'pending');
+
+      if (deleteError) {
+        console.warn('Error deleting pending user:', deleteError);
+        // Don't throw - invite was cancelled, that's the main thing
+      }
+
+      // Also delete from auth.users (requires service role, so this might fail - that's ok)
+      // We'll handle this on the backend if needed
+
+      setSuccess('Invite cancelled and pending user removed');
       await loadInvites();
+      await loadUsers();
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       console.error('Error cancelling invite:', err);
       setError(err.message || 'Failed to cancel invite');
+    }
+  };
+
+  const cancelPendingUser = async (userId, email) => {
+    if (!confirm(`Remove pending invitation for ${email}?`)) {
+      return;
+    }
+
+    try {
+      // Call Edge Function to fully delete pending user (profiles + auth.users)
+      const { data, error: functionError } = await supabase.functions.invoke('delete-pending-user', {
+        body: {
+          user_id: userId,
+          email: email
+        }
+      });
+
+      if (functionError) {
+        throw new Error(functionError.message || 'Failed to delete pending user');
+      }
+
+      setSuccess('Pending user completely removed');
+      await loadInvites();
+      await loadUsers();
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      console.error('Error removing pending user:', err);
+      setError(err.message || 'Failed to remove pending user');
     }
   };
 
@@ -198,12 +261,18 @@ export default function UserManagementPanel({ currentUserId }) {
     );
   });
 
-  // Separate admins and regular users
-  const adminUsers = filteredUsers.filter(u => u.is_admin);
-  const regularUsers = filteredUsers.filter(u => !u.is_admin);
+  // Separate admins, regular users, and pending users
+  const adminUsers = filteredUsers.filter(u => u.is_admin && u.account_status === 'active');
+  const regularUsers = filteredUsers.filter(u => !u.is_admin && u.account_status === 'active');
+  const pendingUsers = filteredUsers.filter(u => u.account_status === 'pending');
 
-  // Filter pending invites
-  const pendingInvites = invites.filter(inv => inv.status === 'pending' && new Date(inv.expires_at) > new Date());
+  // Filter pending invites - exclude those that already have a pending user (to avoid duplicates)
+  const pendingUserEmails = pendingUsers.map(u => u.email?.toLowerCase());
+  const pendingInvites = invites.filter(inv =>
+    inv.status === 'pending' &&
+    new Date(inv.expires_at) > new Date() &&
+    !pendingUserEmails.includes(inv.email.toLowerCase()) // Don't show invite if user already exists
+  );
 
   return (
     <div className="space-y-6">
@@ -273,18 +342,61 @@ export default function UserManagementPanel({ currentUserId }) {
         </div>
       ) : (
         <div className="space-y-6">
-          {/* Pending Invites */}
-          {pendingInvites.length > 0 && (
+          {/* Combined Pending Invitations Section */}
+          {(pendingInvites.length > 0 || pendingUsers.length > 0) && (
             <div className="bg-white border border-blue-200 rounded-lg overflow-hidden">
               <div className="bg-blue-50 px-4 py-3 border-b border-blue-200">
                 <h3 className="font-semibold text-blue-900 flex items-center gap-2">
                   <Send size={18} />
-                  Pending Invites ({pendingInvites.length})
+                  Pending Invitations ({pendingInvites.length + pendingUsers.length})
                 </h3>
+                <p className="text-xs text-blue-700 mt-1">
+                  {pendingUsers.length > 0 && `${pendingUsers.length} awaiting activation`}
+                  {pendingInvites.length > 0 && pendingUsers.length > 0 && ', '}
+                  {pendingInvites.length > 0 && `${pendingInvites.length} pending`}
+                </p>
               </div>
               <div className="divide-y divide-gray-200">
+                {/* Pending Users (invited, email sent, awaiting activation) */}
+                {pendingUsers.map(user => (
+                  <div key={`user-${user.id}`} className="p-4 hover:bg-gray-50 transition">
+                    <div className="flex justify-between items-start">
+                      <div className="flex-1">
+                        <div className="mb-2">
+                          <p className="font-medium text-gray-900">
+                            {user.full_name}
+                          </p>
+                          <p className="text-sm text-gray-500 flex items-center gap-1">
+                            <Mail size={14} />
+                            {user.email}
+                          </p>
+                        </div>
+                        <div className="flex gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            Invited {new Date(user.created_at).toLocaleDateString()}
+                          </span>
+                          <span className="inline-block bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded text-xs flex items-center gap-1">
+                            <CheckCircle size={12} />
+                            Awaiting Activation
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => cancelPendingUser(user.id, user.email)}
+                        className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-700 rounded-md hover:bg-red-100 text-sm transition"
+                        title="Remove pending invitation"
+                      >
+                        <XCircle size={16} />
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+
+                {/* Pending Invites (invite record exists) */}
                 {pendingInvites.map(invite => (
-                  <div key={invite.id} className="p-4 hover:bg-gray-50 transition">
+                  <div key={`invite-${invite.id}`} className="p-4 hover:bg-gray-50 transition">
                     <div className="flex justify-between items-start">
                       <div className="flex-1">
                         <div className="mb-2">
@@ -323,6 +435,7 @@ export default function UserManagementPanel({ currentUserId }) {
               </div>
             </div>
           )}
+
           {/* Admin Users */}
           {adminUsers.length > 0 && (
             <div className="bg-white border border-purple-200 rounded-lg overflow-hidden">

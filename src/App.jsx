@@ -83,9 +83,25 @@ export default function AviationLogbook() {
   // Auth form state
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
-  const [registerName, setRegisterName] = useState('');
+  const [registerForename, setRegisterForename] = useState('');
+  const [registerSurname, setRegisterSurname] = useState('');
   const [registerEmail, setRegisterEmail] = useState('');
   const [registerPassword, setRegisterPassword] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+
+  // Profile completion state
+  const [showProfileCompletionModal, setShowProfileCompletionModal] = useState(false);
+
+  // Check for invite parameter in URL
+  React.useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const invite = urlParams.get('invite');
+    if (invite) {
+      setInviteEmail(invite);
+      setRegisterEmail(invite);
+      setShowLogin(false); // Show registration form
+    }
+  }, []);
 
   // Form data states
   const [formData, setFormData] = useState({
@@ -106,11 +122,16 @@ export default function AviationLogbook() {
   });
 
   const [profileFormData, setProfileFormData] = useState({
-    full_name: '',
+    title: '',
+    forename: '',
+    surname: '',
     date_of_birth: '',
-    place_of_birth: '',
     nationality: '',
-    naa_reference: ''
+    licence_number: '',
+    // Note: permanent_address and postcode are not stored in profiles table
+    // They are display-only fields populated from address_history
+    permanent_address: '', // Display only
+    postcode: '' // Display only
   });
 
   const [addressFormData, setAddressFormData] = useState({
@@ -153,15 +174,73 @@ export default function AviationLogbook() {
   // Update profile form data when profile loads
   React.useEffect(() => {
     if (profile) {
+      // Always populate address from current address in address_history
+      let permanentAddress = '';
+      let postcode = '';
+
+      const currentAddress = addresses?.find(addr => addr.is_current);
+      if (currentAddress) {
+        // Construct permanent address from address fields
+        const addressParts = [
+          currentAddress.address_line_1,
+          currentAddress.address_line_2,
+          currentAddress.city,
+          currentAddress.county
+        ].filter(Boolean); // Remove empty values
+        permanentAddress = addressParts.join('\n');
+        postcode = currentAddress.postcode || '';
+      }
+
       setProfileFormData({
-        full_name: profile.full_name || '',
+        title: profile.title || '',
+        forename: profile.forename || '',
+        surname: profile.surname || '',
         date_of_birth: profile.date_of_birth || '',
-        place_of_birth: profile.place_of_birth || '',
         nationality: profile.nationality || '',
-        naa_reference: profile.naa_reference || ''
+        licence_number: profile.licence_number || '',
+        permanent_address: permanentAddress,
+        postcode: postcode
       });
     }
-  }, [profile]);
+  }, [profile, addresses]);
+
+  // Check if profile is complete - if not, force user to complete it
+  React.useEffect(() => {
+    console.log('Profile completion effect triggered:', {
+      hasUser: !!user,
+      hasProfile: !!profile,
+      dataLoading: dataLoading,
+      addressCount: addresses?.length || 0
+    });
+
+    if (user && profile && !dataLoading) {
+      const isProfileComplete =
+        profile.title &&
+        profile.forename &&
+        profile.surname &&
+        profile.date_of_birth &&
+        profile.nationality &&
+        addresses?.some(addr => addr.is_current); // Must have a current address
+
+      console.log('Profile completion check:', {
+        hasTitle: !!profile.title,
+        hasForename: !!profile.forename,
+        hasSurname: !!profile.surname,
+        hasDOB: !!profile.date_of_birth,
+        hasNationality: !!profile.nationality,
+        hasCurrentAddress: addresses?.some(addr => addr.is_current),
+        isComplete: isProfileComplete
+      });
+
+      if (!isProfileComplete) {
+        console.log('Profile incomplete - showing modal');
+        setShowProfileCompletionModal(true);
+        setCurrentView('profile'); // Force them to profile view
+      } else {
+        console.log('Profile is complete - no modal needed');
+      }
+    }
+  }, [user, profile, addresses, dataLoading]);
 
   // Auth handlers
   const handleLogin = async () => {
@@ -181,9 +260,79 @@ export default function AviationLogbook() {
     try {
       setError('');
       setLoading(true);
-      await register(registerEmail, registerPassword, registerName);
+
+      // If registering via invite, validate the invite
+      let inviteData = null;
+      if (inviteEmail) {
+        const { data, error: inviteError } = await supabase
+          .from('invites')
+          .select('*')
+          .eq('email', inviteEmail.toLowerCase())
+          .eq('status', 'pending')
+          .single();
+
+        if (inviteError || !data) {
+          setError('Invalid or expired invite. Please contact an administrator.');
+          setLoading(false);
+          return;
+        }
+
+        // Check if invite is expired
+        if (new Date(data.expires_at) < new Date()) {
+          setError('This invite has expired. Please contact an administrator.');
+          setLoading(false);
+          return;
+        }
+
+        inviteData = data;
+      }
+
+      // Register the user
+      await register(registerEmail, registerPassword, registerForename, registerSurname);
+
+      // If invite exists, mark it as accepted and apply admin privileges
+      if (inviteData) {
+        // Wait a moment for the auth user and profile to be created
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // Get the newly created user
+        const { data: { user: newUser } } = await supabase.auth.getUser();
+
+        if (newUser) {
+          // Update invite status
+          await supabase
+            .from('invites')
+            .update({
+              status: 'accepted',
+              accepted_at: new Date().toISOString()
+            })
+            .eq('id', inviteData.id);
+
+          // Apply admin privileges if granted
+          if (inviteData.is_admin) {
+            await supabase
+              .from('profiles')
+              .update({ is_admin: true })
+              .eq('id', newUser.id);
+          }
+
+          // Ensure email is saved to profile and mark account as active
+          await supabase
+            .from('profiles')
+            .update({
+              email: registerEmail.toLowerCase(),
+              account_status: 'active'  // Mark as active now that they've completed registration
+            })
+            .eq('id', newUser.id);
+        }
+      }
+
       setSuccess('Registration successful! Please check your email to verify your account.');
       setShowLogin(true);
+      setInviteEmail(''); // Clear invite
+
+      // Clear URL parameter
+      window.history.replaceState({}, document.title, window.location.pathname);
     } catch (err) {
       setError(err.message);
     } finally {
@@ -199,24 +348,60 @@ export default function AviationLogbook() {
   // Profile handlers
   const handleUpdateProfile = async () => {
     try {
-      if (!profileFormData.full_name) {
-        setError('Full name is required');
+      // Validate required fields
+      if (!profileFormData.title || !profileFormData.forename || !profileFormData.surname) {
+        setError('Title, forename, and surname are required');
+        return;
+      }
+      if (!profileFormData.date_of_birth) {
+        setError('Date of birth is required');
+        return;
+      }
+      if (!profileFormData.nationality) {
+        setError('Nationality is required');
+        return;
+      }
+
+      // Check that user has a current address in address_history
+      const hasCurrentAddress = addresses?.some(addr => addr.is_current);
+      if (!hasCurrentAddress) {
+        setError('Please add a current address in the Address History section below');
         return;
       }
 
       setError('');
       setLoading(true);
 
+      // Extract only the fields that should be saved to profiles table
+      // (permanent_address and postcode are NOT saved - they come from address_history)
+      const { permanent_address, postcode, ...profileDataToSave } = profileFormData;
+
       const { error } = await supabase
         .from('profiles')
         .upsert({
           id: user.id,
-          ...profileFormData
+          ...profileDataToSave,
+          // Also update email if it exists in the form
+          email: user.email
         });
 
       if (error) throw error;
       setSuccess('Profile updated successfully!');
       await reloadData();
+
+      // Check if profile is now complete and close the completion modal if it is
+      const updatedProfile = { ...profile, ...profileDataToSave };
+      const isNowComplete =
+        updatedProfile.title &&
+        updatedProfile.forename &&
+        updatedProfile.surname &&
+        updatedProfile.date_of_birth &&
+        updatedProfile.nationality &&
+        hasCurrentAddress; // Already declared above
+
+      if (isNowComplete) {
+        setShowProfileCompletionModal(false);
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -766,8 +951,10 @@ export default function AviationLogbook() {
             />
           ) : (
             <RegisterForm
-              name={registerName}
-              setName={setRegisterName}
+              forename={registerForename}
+              setForename={setRegisterForename}
+              surname={registerSurname}
+              setSurname={setRegisterSurname}
               email={registerEmail}
               setEmail={setRegisterEmail}
               password={registerPassword}
@@ -779,6 +966,7 @@ export default function AviationLogbook() {
                 setSuccess('');
               }}
               loading={loading}
+              inviteEmail={inviteEmail}
             />
           )}
         </div>
@@ -944,6 +1132,89 @@ export default function AviationLogbook() {
         }}
         onCancel={() => setConfirmDialog({ ...confirmDialog, isOpen: false })}
       />
+
+      {/* Profile Completion Modal - Prevents navigation until profile is complete */}
+      {showProfileCompletionModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-start justify-center z-50 overflow-y-auto py-8">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+            <div className="p-6 border-b border-gray-200 bg-red-50">
+              <h2 className="text-2xl font-bold text-red-900">Complete Your Profile Required</h2>
+              <p className="text-red-700 mt-2">
+                You must complete all required profile information before accessing the application.
+              </p>
+            </div>
+            <div className="p-6">
+              <div className="bg-blue-50 border border-blue-200 p-4 rounded-md mb-6">
+                <h3 className="font-semibold text-blue-900 mb-2">What you need to provide:</h3>
+                <ul className="space-y-1 text-sm text-blue-800">
+                  <li className="flex items-center gap-2">
+                    <span className={profileFormData.title ? "text-green-600" : "text-red-600"}>
+                      {profileFormData.title ? "✓" : "○"}
+                    </span>
+                    Title (Mr, Mrs, Ms, Miss, Dr, Prof, Rev)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className={profileFormData.forename ? "text-green-600" : "text-red-600"}>
+                      {profileFormData.forename ? "✓" : "○"}
+                    </span>
+                    Forename(s)
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className={profileFormData.surname ? "text-green-600" : "text-red-600"}>
+                      {profileFormData.surname ? "✓" : "○"}
+                    </span>
+                    Surname
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className={profileFormData.date_of_birth ? "text-green-600" : "text-red-600"}>
+                      {profileFormData.date_of_birth ? "✓" : "○"}
+                    </span>
+                    Date of Birth
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className={profileFormData.nationality ? "text-green-600" : "text-red-600"}>
+                      {profileFormData.nationality ? "✓" : "○"}
+                    </span>
+                    Nationality
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <span className={addresses?.some(addr => addr.is_current) ? "text-green-600" : "text-red-600"}>
+                      {addresses?.some(addr => addr.is_current) ? "✓" : "○"}
+                    </span>
+                    Current Address (add in Address History section below)
+                  </li>
+                </ul>
+              </div>
+              <p className="text-sm text-gray-600 mb-4">
+                Please scroll down to fill in your personal information and add your current address in the Address History section.
+              </p>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => {
+                    const hasCurrentAddress = addresses?.some(addr => addr.is_current);
+                    const isComplete =
+                      profileFormData.title &&
+                      profileFormData.forename &&
+                      profileFormData.surname &&
+                      profileFormData.date_of_birth &&
+                      profileFormData.nationality &&
+                      hasCurrentAddress;
+
+                    if (isComplete) {
+                      setShowProfileCompletionModal(false);
+                    } else {
+                      setError('Please complete all required fields before continuing');
+                    }
+                  }}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+                >
+                  I've Completed My Profile
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

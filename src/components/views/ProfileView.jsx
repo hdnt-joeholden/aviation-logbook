@@ -18,68 +18,138 @@ export default function ProfileView({
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-semibold text-gray-800 mb-6">Personal Information</h2>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name <span className="text-red-500">*</span>
+                Title <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={profileFormData.title || ''}
+                onChange={(e) => setProfileFormData({...profileFormData, title: e.target.value})}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              >
+                <option value="">Select...</option>
+                <option value="Mr">Mr</option>
+                <option value="Mrs">Mrs</option>
+                <option value="Ms">Ms</option>
+                <option value="Miss">Miss</option>
+                <option value="Dr">Dr</option>
+                <option value="Prof">Prof</option>
+                <option value="Rev">Rev</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Forename(s) <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                value={profileFormData.full_name}
-                onChange={(e) => setProfileFormData({...profileFormData, full_name: e.target.value})}
+                value={profileFormData.forename || ''}
+                onChange={(e) => setProfileFormData({...profileFormData, forename: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="John Smith"
+                placeholder="John"
+                required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Date of Birth
+                Surname <span className="text-red-500">*</span>
               </label>
               <input
-                type="date"
-                value={profileFormData.date_of_birth}
-                onChange={(e) => setProfileFormData({...profileFormData, date_of_birth: e.target.value})}
+                type="text"
+                value={profileFormData.surname || ''}
+                onChange={(e) => setProfileFormData({...profileFormData, surname: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Smith"
+                required
               />
             </div>
           </div>
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Place of Birth
+                Date of Birth <span className="text-red-500">*</span>
               </label>
               <input
-                type="text"
-                value={profileFormData.place_of_birth}
-                onChange={(e) => setProfileFormData({...profileFormData, place_of_birth: e.target.value})}
+                type="date"
+                value={profileFormData.date_of_birth || ''}
+                onChange={(e) => setProfileFormData({...profileFormData, date_of_birth: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="London, United Kingdom"
+                required
               />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Nationality
+                Nationality <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={profileFormData.nationality}
+              <select
+                value={profileFormData.nationality || ''}
                 onChange={(e) => setProfileFormData({...profileFormData, nationality: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="British"
-              />
+                required
+              >
+                <option value="">Select...</option>
+                <option value="British">British</option>
+                <option value="Irish">Irish</option>
+                <option value="American">American</option>
+                <option value="Canadian">Canadian</option>
+                <option value="Australian">Australian</option>
+                <option value="New Zealand">New Zealand</option>
+                <option value="French">French</option>
+                <option value="German">German</option>
+                <option value="Spanish">Spanish</option>
+                <option value="Italian">Italian</option>
+                <option value="Dutch">Dutch</option>
+                <option value="Belgian">Belgian</option>
+                <option value="Swiss">Swiss</option>
+                <option value="Austrian">Austrian</option>
+                <option value="Polish">Polish</option>
+                <option value="Other">Other</option>
+              </select>
             </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              NAA Reference Number
+              Licence Number <span className="text-gray-400">(Optional)</span>
             </label>
             <input
               type="text"
-              value={profileFormData.naa_reference}
-              onChange={(e) => setProfileFormData({...profileFormData, naa_reference: e.target.value})}
+              value={profileFormData.licence_number || ''}
+              onChange={(e) => setProfileFormData({...profileFormData, licence_number: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="UK.XXXXX"
+              placeholder="UK.123456.AME"
             />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Permanent Address <span className="text-red-500">*</span>
+              <span className="text-gray-500 text-xs ml-2">(From current address in Address History)</span>
+            </label>
+            <textarea
+              value={profileFormData.permanent_address || ''}
+              readOnly
+              disabled
+              className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 cursor-not-allowed"
+              placeholder="Add a current address in Address History below"
+              rows="3"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Postcode <span className="text-red-500">*</span>
+                <span className="text-gray-500 text-xs ml-2">(From current address)</span>
+              </label>
+              <input
+                type="text"
+                value={profileFormData.postcode || ''}
+                readOnly
+                disabled
+                className="w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-600 cursor-not-allowed"
+                placeholder="From address history"
+              />
+            </div>
           </div>
           <div className="flex justify-end pt-4">
             <button

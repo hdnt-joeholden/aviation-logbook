@@ -26,13 +26,15 @@ export function useAuth() {
     if (error) throw error;
   };
 
-  const register = async (email, password, fullName) => {
+  const register = async (email, password, forename, surname) => {
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
-          full_name: fullName
+          forename: forename,
+          surname: surname,
+          account_status: 'active'  // Mark as active for normal signups
         }
       }
     });
