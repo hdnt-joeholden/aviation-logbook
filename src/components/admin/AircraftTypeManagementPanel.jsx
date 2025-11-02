@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Plus, Edit2, Trash2, Plane, AlertCircle } from 'lucide-react';
 import AircraftTypeModal from '../modals/AircraftTypeModal';
+import ConfirmModal from '../modals/ConfirmModal';
 import { supabase } from '../../lib/supabaseClient';
 
 export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadData }) {
@@ -13,6 +14,15 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [confirmModal, setConfirmModal] = useState({
+    isOpen: false,
+    title: '',
+    message: '',
+    variant: 'warning',
+    showCancel: true,
+    confirmText: 'Confirm',
+    onConfirm: () => {}
+  });
 
   const openModal = (type = null) => {
     if (type) {
@@ -114,34 +124,78 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       const totalUsage = (aircraftCount || 0) + (linkCount || 0);
 
       if (totalUsage > 0) {
-        alert(`Cannot delete this aircraft type. It is currently being used by ${totalUsage} item(s). Please remove those references first.`);
+        setConfirmModal({
+          isOpen: true,
+          title: 'Cannot Delete Aircraft Type',
+          message: `This aircraft type is currently being used by ${totalUsage} item(s). Please remove those references first.`,
+          variant: 'warning',
+          showCancel: false,
+          confirmText: 'OK',
+          onConfirm: () => {}
+        });
         return;
       }
 
-      if (!confirm('Are you sure you want to delete this aircraft type?')) {
-        return;
-      }
+      // Show confirmation dialog
+      setConfirmModal({
+        isOpen: true,
+        title: 'Delete Aircraft Type',
+        message: 'Are you sure you want to delete this aircraft type? This action cannot be undone.',
+        variant: 'danger',
+        showCancel: true,
+        confirmText: 'Delete',
+        onConfirm: async () => {
+          try {
+            console.log('Attempting to delete aircraft type:', typeId);
 
-      console.log('Attempting to delete aircraft type:', typeId);
+            const { data: deleteData, error: deleteError } = await supabase
+              .from('aircraft_types')
+              .delete()
+              .eq('id', typeId)
+              .select();
 
-      const { data: deleteData, error: deleteError } = await supabase
-        .from('aircraft_types')
-        .delete()
-        .eq('id', typeId)
-        .select();
+            console.log('Delete result:', { deleteData, deleteError });
 
-      console.log('Delete result:', { deleteData, deleteError });
+            if (deleteError) throw deleteError;
 
-      if (deleteError) throw deleteError;
+            console.log('Reloading data...');
+            await onReloadData();
+            console.log('Data reloaded');
 
-      console.log('Reloading data...');
-      await onReloadData();
-      console.log('Data reloaded');
-
-      alert('Aircraft type deleted successfully');
+            setConfirmModal({
+              isOpen: true,
+              title: 'Success',
+              message: 'Aircraft type deleted successfully',
+              variant: 'success',
+              showCancel: false,
+              confirmText: 'OK',
+              onConfirm: () => {}
+            });
+          } catch (err) {
+            console.error('Error deleting aircraft type:', err);
+            setConfirmModal({
+              isOpen: true,
+              title: 'Error',
+              message: `Failed to delete aircraft type: ${err.message}`,
+              variant: 'danger',
+              showCancel: false,
+              confirmText: 'OK',
+              onConfirm: () => {}
+            });
+          }
+        }
+      });
     } catch (err) {
-      console.error('Error deleting aircraft type:', err);
-      alert('Failed to delete aircraft type: ' + err.message);
+      console.error('Error checking aircraft type usage:', err);
+      setConfirmModal({
+        isOpen: true,
+        title: 'Error',
+        message: `Failed to check aircraft type usage: ${err.message}`,
+        variant: 'danger',
+        showCancel: false,
+        confirmText: 'OK',
+        onConfirm: () => {}
+      });
     }
   };
 
@@ -239,6 +293,17 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         editingType={editingType}
         loading={loading}
         error={error}
+      />
+
+      <ConfirmModal
+        isOpen={confirmModal.isOpen}
+        onClose={() => setConfirmModal({ ...confirmModal, isOpen: false })}
+        onConfirm={confirmModal.onConfirm}
+        title={confirmModal.title}
+        message={confirmModal.message}
+        variant={confirmModal.variant}
+        showCancel={confirmModal.showCancel}
+        confirmText={confirmModal.confirmText}
       />
     </>
   );
