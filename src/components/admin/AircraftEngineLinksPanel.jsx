@@ -158,7 +158,9 @@ export default function AircraftEngineLinksPanel({
           <option value="">Choose an aircraft type...</option>
           {aircraftTypes.map(type => (
             <option key={type.id} value={type.id}>
-              {type.type_code}
+              {type.manufacturer && type.model
+                ? `${type.manufacturer} ${type.model}`
+                : type.manufacturer || type.model || type.type_code}
             </option>
           ))}
         </select>
@@ -198,7 +200,7 @@ export default function AircraftEngineLinksPanel({
                     <option value="">Select an engine...</option>
                     {availableEngines.map(engine => (
                       <option key={engine.id} value={engine.id}>
-                        {engine.full_designation || `${engine.manufacturer} ${engine.model}${engine.variant ? `-${engine.variant}` : ''}`}
+                        {engine.full_designation || `${engine.manufacturer} ${engine.model}`}
                       </option>
                     ))}
                   </select>
@@ -235,7 +237,9 @@ export default function AircraftEngineLinksPanel({
             <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
               <h3 className="font-semibold text-gray-800 flex items-center gap-2">
                 <LinkIcon size={18} />
-                Compatible Engines for {selectedAircraftInfo?.type_code}
+                Compatible Engines for {selectedAircraftInfo?.manufacturer && selectedAircraftInfo?.model
+                  ? `${selectedAircraftInfo.manufacturer} ${selectedAircraftInfo.model}`
+                  : selectedAircraftInfo?.manufacturer || selectedAircraftInfo?.model || selectedAircraftInfo?.type_code}
               </h3>
               <p className="text-xs text-gray-500 mt-1">
                 {linkedEngines.length} engine{linkedEngines.length !== 1 ? 's' : ''} linked
@@ -276,8 +280,7 @@ export default function AircraftEngineLinksPanel({
                         </button>
                         <div>
                           <p className="font-medium text-gray-800">
-                            {link.engine.full_designation ||
-                              `${link.engine.manufacturer} ${link.engine.model}${link.engine.variant ? `-${link.engine.variant}` : ''}`}
+                            {link.engine.full_designation || `${link.engine.manufacturer} ${link.engine.model}`}
                           </p>
                           <p className="text-sm text-gray-500">
                             {link.engine.manufacturer}
