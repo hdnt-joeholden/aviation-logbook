@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit2, Trash2, Plane, AlertCircle } from 'lucide-react';
+import { Plus, Edit2, Trash2, Plane, AlertCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import AircraftTypeModal from '../modals/AircraftTypeModal';
 import ConfirmModal from '../modals/ConfirmModal';
 import { supabase } from '../../lib/supabaseClient';
@@ -14,6 +14,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [collapsedManufacturers, setCollapsedManufacturers] = useState(new Set());
   const [confirmModal, setConfirmModal] = useState({
     isOpen: false,
     title: '',
@@ -48,6 +49,16 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
     setIsModalOpen(false);
     setEditingType(null);
     setError('');
+  };
+
+  const toggleManufacturer = (manufacturer) => {
+    const newCollapsed = new Set(collapsedManufacturers);
+    if (newCollapsed.has(manufacturer)) {
+      newCollapsed.delete(manufacturer);
+    } else {
+      newCollapsed.add(manufacturer);
+    }
+    setCollapsedManufacturers(newCollapsed);
   };
 
   const handleSubmit = async () => {
@@ -268,46 +279,62 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         <div className="space-y-6">
           {Object.entries(typesByManufacturer)
             .sort(([a], [b]) => a.localeCompare(b))
-            .map(([manufacturer, manufacturerTypes]) => (
-              <div key={manufacturer} className="border border-gray-200 rounded-lg overflow-hidden">
-                <div className="bg-gray-50 px-4 py-3 border-b border-gray-200">
-                  <h3 className="font-semibold text-gray-800">{manufacturer}</h3>
-                  <p className="text-xs text-gray-500">{manufacturerTypes.length} aircraft type{manufacturerTypes.length !== 1 ? 's' : ''}</p>
-                </div>
-                <div className="divide-y divide-gray-200">
-                  {manufacturerTypes
-                    .sort((a, b) => a.type_code.localeCompare(b.type_code))
-                    .map(type => (
-                      <div key={type.id} className="p-4 hover:bg-gray-50 transition flex justify-between items-center">
-                        <div>
-                          <p className="font-medium text-gray-800">
-                            {type.type_code}
-                          </p>
-                          <p className="text-sm text-gray-500">
-                            {type.model || 'No description'}
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => openModal(type)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
-                            title="Edit aircraft type"
-                          >
-                            <Edit2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(type.id)}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
-                            title="Delete aircraft type"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
+            .map(([manufacturer, manufacturerTypes]) => {
+              const isCollapsed = collapsedManufacturers.has(manufacturer);
+              return (
+                <div key={manufacturer} className="border border-gray-200 rounded-lg overflow-hidden">
+                  <button
+                    onClick={() => toggleManufacturer(manufacturer)}
+                    className="w-full bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center justify-between hover:bg-gray-100 transition"
+                  >
+                    <div className="flex items-center gap-2">
+                      {isCollapsed ? <ChevronRight size={18} /> : <ChevronDown size={18} />}
+                      <div className="text-left">
+                        <h3 className="font-semibold text-gray-800">{manufacturer}</h3>
+                        <p className="text-xs text-gray-500">{manufacturerTypes.length} aircraft type{manufacturerTypes.length !== 1 ? 's' : ''}</p>
                       </div>
-                    ))}
+                    </div>
+                  </button>
+                  {!isCollapsed && (
+                    <div className="divide-y divide-gray-200">
+                      {manufacturerTypes
+                        .sort((a, b) => a.type_code.localeCompare(b.type_code))
+                        .map(type => (
+                          <div key={type.id} className="p-4 hover:bg-gray-50 transition flex justify-between items-center">
+                            <div>
+                              <p className="font-medium text-gray-800">
+                                {type.manufacturer && type.model
+                                  ? `${type.manufacturer} ${type.model}`
+                                  : type.manufacturer || type.model || 'Unnamed aircraft type'
+                                }
+                              </p>
+                              <p className="text-sm text-gray-500">
+                                {type.type_code}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => openModal(type)}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-md transition"
+                                title="Edit aircraft type"
+                              >
+                                <Edit2 size={16} />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(type.id)}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-md transition"
+                                title="Delete aircraft type"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       )}
 
