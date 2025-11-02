@@ -3,6 +3,7 @@ import { Shield, ShieldOff, Users, Search, Mail, Calendar, UserPlus, X, Send, Cl
 import { supabase } from '../../lib/supabaseClient';
 import ConfirmModal from '../modals/ConfirmModal';
 import UserDetailsModal from '../modals/UserDetailsModal';
+import DeleteUserConfirmModal from '../modals/DeleteUserConfirmModal';
 
 export default function UserManagementPanel({ currentUserId }) {
   const [users, setUsers] = useState([]);
@@ -28,6 +29,8 @@ export default function UserManagementPanel({ currentUserId }) {
   });
   const [selectedUser, setSelectedUser] = useState(null);
   const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
+  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
+  const [userToDelete, setUserToDelete] = useState(null);
 
   useEffect(() => {
     loadUsers();
@@ -407,16 +410,10 @@ export default function UserManagementPanel({ currentUserId }) {
   };
 
   const handleDeleteUser = async (userId) => {
-    const userToDelete = users.find(u => u.id === userId);
-    if (!userToDelete) return;
+    const user = users.find(u => u.id === userId);
+    if (!user) return;
 
-    const userName = `${userToDelete.title} ${userToDelete.forename} ${userToDelete.surname}`;
-    const userEmail = userToDelete.email;
-    const accountCreated = new Date(userToDelete.created_at).toLocaleDateString('en-GB', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
+    const userName = `${user.title} ${user.forename} ${user.surname}`;
 
     // First confirmation - show warning
     setConfirmModal({
@@ -427,37 +424,21 @@ export default function UserManagementPanel({ currentUserId }) {
       showCancel: true,
       confirmText: 'Continue',
       onConfirm: () => {
-        // Second confirmation - require email verification
-        const emailVerification = prompt(
-          `⚠️ FINAL CONFIRMATION\n\n` +
-          `You are about to PERMANENTLY DELETE:\n` +
-          `• User: ${userName}\n` +
-          `• Email: ${userEmail}\n` +
-          `• Account Created: ${accountCreated}\n` +
-          `• All associated data (entries, aircraft, supervisors, addresses)\n\n` +
-          `This action CANNOT be undone.\n\n` +
-          `To confirm, please type the user's email address exactly:\n` +
-          `${userEmail}`
-        );
-
-        if (emailVerification === userEmail) {
-          // Email matches, proceed with deletion
-          performUserDeletion(userId, userToDelete);
-        } else if (emailVerification !== null) {
-          // User typed something but it didn't match
-          setError('Email verification failed. Deletion cancelled.');
-        }
-        // If emailVerification is null, user clicked cancel - do nothing
+        // Second confirmation - show email verification modal
+        setUserToDelete(user);
+        setShowDeleteConfirmModal(true);
       }
     });
   };
 
-  const performUserDeletion = async (userId, userToDelete) => {
+  const performUserDeletion = async () => {
+    if (!userToDelete) return;
+
     try {
       // Call Edge Function to fully delete user (profiles, auth.users, and all related data)
       const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
         body: {
-          user_id: userId,
+          user_id: userToDelete.id,
           email: userToDelete.email
         }
       });
@@ -467,11 +448,15 @@ export default function UserManagementPanel({ currentUserId }) {
       }
 
       setSuccess('User and all associated data deleted successfully');
+      setShowDeleteConfirmModal(false);
+      setUserToDelete(null);
       await loadUsers();
 
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
       setError(err.message || 'Failed to delete user');
+      setShowDeleteConfirmModal(false);
+      setUserToDelete(null);
     }
   };
 
@@ -952,6 +937,16 @@ export default function UserManagementPanel({ currentUserId }) {
         onSendPasswordReset={handleSendPasswordReset}
         onDelete={handleDeleteUser}
         currentUserId={currentUserId}
+      />
+
+      <DeleteUserConfirmModal
+        isOpen={showDeleteConfirmModal}
+        onClose={() => {
+          setShowDeleteConfirmModal(false);
+          setUserToDelete(null);
+        }}
+        onConfirm={performUserDeletion}
+        user={userToDelete}
       />
     </div>
   );
