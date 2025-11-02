@@ -406,6 +406,44 @@ export default function UserManagementPanel({ currentUserId }) {
     }
   };
 
+  const handleDeleteUser = async (userId) => {
+    const userToDelete = users.find(u => u.id === userId);
+    if (!userToDelete) return;
+
+    const userName = `${userToDelete.title} ${userToDelete.forename} ${userToDelete.surname}`;
+
+    setConfirmModal({
+      isOpen: true,
+      title: 'Delete User Account',
+      message: `Are you sure you want to permanently delete ${userName}? This will delete all their data including entries, aircraft, supervisors, and addresses. This action cannot be undone.`,
+      variant: 'danger',
+      showCancel: true,
+      confirmText: 'Delete Permanently',
+      onConfirm: async () => {
+        try {
+          // Call Edge Function to fully delete user (profiles, auth.users, and all related data)
+          const { data, error: functionError } = await supabase.functions.invoke('delete-user', {
+            body: {
+              user_id: userId,
+              email: userToDelete.email
+            }
+          });
+
+          if (functionError) {
+            throw new Error(functionError.message || 'Failed to delete user');
+          }
+
+          setSuccess('User and all associated data deleted successfully');
+          await loadUsers();
+
+          setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+          setError(err.message || 'Failed to delete user');
+        }
+      }
+    });
+  };
+
   // Filter users based on search term
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
@@ -881,6 +919,7 @@ export default function UserManagementPanel({ currentUserId }) {
         onSuspend={handleSuspendUser}
         onActivate={handleActivateUser}
         onSendPasswordReset={handleSendPasswordReset}
+        onDelete={handleDeleteUser}
         currentUserId={currentUserId}
       />
     </div>

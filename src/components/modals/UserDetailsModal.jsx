@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Mail, Calendar, Shield, Clock, Key, Ban, CheckCircle, Save, AlertCircle } from 'lucide-react';
+import { X, User, Mail, Calendar, Shield, Clock, Key, Ban, CheckCircle, Save, AlertCircle, Trash2 } from 'lucide-react';
 
 export default function UserDetailsModal({
   isOpen,
@@ -9,6 +9,7 @@ export default function UserDetailsModal({
   onSuspend,
   onActivate,
   onSendPasswordReset,
+  onDelete,
   currentUserId
 }) {
   const [editMode, setEditMode] = useState(false);
@@ -76,6 +77,16 @@ export default function UserDetailsModal({
     setLoading(true);
     try {
       await onSendPasswordReset(user.email);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await onDelete(user.id);
+      onClose(); // Close modal after delete
     } finally {
       setLoading(false);
     }
@@ -400,6 +411,18 @@ export default function UserDetailsModal({
                       </div>
                     </button>
                   )}
+
+                  <button
+                    onClick={handleDelete}
+                    disabled={loading}
+                    className="w-full flex items-center gap-3 px-4 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition disabled:opacity-50"
+                  >
+                    <Trash2 size={18} />
+                    <div className="text-left">
+                      <p className="font-medium text-sm">Delete User Account</p>
+                      <p className="text-xs text-gray-300">Permanently delete this user and all their data</p>
+                    </div>
+                  </button>
                 </>
               )}
             </div>
