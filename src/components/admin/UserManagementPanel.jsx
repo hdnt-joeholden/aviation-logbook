@@ -46,7 +46,7 @@ export default function UserManagementPanel({ currentUserId }) {
         .from('invites')
         .select(`
           *,
-          invited_by_profile:profiles!invited_by(full_name)
+          invited_by_profile:profiles!invited_by(forename, surname)
         `)
         .order('invited_at', { ascending: false });
 
@@ -99,16 +99,20 @@ export default function UserManagementPanel({ currentUserId }) {
         // Get current user's profile for the invited_by name
         const { data: currentUserProfile } = await supabase
           .from('profiles')
-          .select('full_name')
+          .select('forename, surname')
           .eq('id', currentUserId)
           .single();
+
+        const invitedByName = currentUserProfile
+          ? `${currentUserProfile.forename} ${currentUserProfile.surname}`.trim()
+          : 'An administrator';
 
         const { data: functionData, error: functionError } = await supabase.functions.invoke('send-invite', {
           body: {
             email: inviteForm.email.toLowerCase(),
             full_name: inviteForm.full_name,
             signup_url: signupUrl,
-            invited_by_name: currentUserProfile?.full_name || 'An administrator'
+            invited_by_name: invitedByName
           }
         });
 
@@ -255,8 +259,9 @@ export default function UserManagementPanel({ currentUserId }) {
   // Filter users based on search term
   const filteredUsers = users.filter(user => {
     const searchLower = searchTerm.toLowerCase();
+    const fullName = `${user.forename || ''} ${user.surname || ''}`.trim();
     return (
-      user.full_name?.toLowerCase().includes(searchLower) ||
+      fullName.toLowerCase().includes(searchLower) ||
       user.email?.toLowerCase().includes(searchLower)
     );
   });
@@ -364,7 +369,7 @@ export default function UserManagementPanel({ currentUserId }) {
                       <div className="flex-1">
                         <div className="mb-2">
                           <p className="font-medium text-gray-900">
-                            {user.full_name}
+                            {user.title} {user.forename} {user.surname}
                           </p>
                           <p className="text-sm text-gray-500 flex items-center gap-1">
                             <Mail size={14} />
@@ -417,7 +422,7 @@ export default function UserManagementPanel({ currentUserId }) {
                             Expires {new Date(invite.expires_at).toLocaleDateString()}
                           </span>
                           {invite.invited_by_profile && (
-                            <span>by {invite.invited_by_profile.full_name}</span>
+                            <span>by {invite.invited_by_profile.forename} {invite.invited_by_profile.surname}</span>
                           )}
                         </div>
                       </div>
@@ -453,7 +458,7 @@ export default function UserManagementPanel({ currentUserId }) {
                         <div className="flex items-center gap-3 mb-2">
                           <div>
                             <p className="font-semibold text-gray-900">
-                              {user.full_name}
+                              {user.title} {user.forename} {user.surname}
                             </p>
                             <p className="text-sm text-gray-500 flex items-center gap-1">
                               <Mail size={14} />
@@ -474,7 +479,7 @@ export default function UserManagementPanel({ currentUserId }) {
                         </div>
                       </div>
                       <button
-                        onClick={() => toggleAdminStatus(user.id, true, user.full_name)}
+                        onClick={() => toggleAdminStatus(user.id, true, `${user.title} ${user.forename} ${user.surname}`)}
                         disabled={user.id === currentUserId}
                         className={`flex items-center gap-2 px-3 py-2 rounded-md text-sm transition ${
                           user.id === currentUserId
@@ -509,7 +514,7 @@ export default function UserManagementPanel({ currentUserId }) {
                       <div className="flex-1">
                         <div className="mb-2">
                           <p className="font-medium text-gray-900">
-                            {user.full_name}
+                            {user.title} {user.forename} {user.surname}
                           </p>
                           <p className="text-sm text-gray-500 flex items-center gap-1">
                             <Mail size={14} />
@@ -524,7 +529,7 @@ export default function UserManagementPanel({ currentUserId }) {
                         </div>
                       </div>
                       <button
-                        onClick={() => toggleAdminStatus(user.id, false, user.full_name)}
+                        onClick={() => toggleAdminStatus(user.id, false, `${user.title} ${user.forename} ${user.surname}`)}
                         className="flex items-center gap-2 px-3 py-2 bg-purple-50 text-purple-700 rounded-md hover:bg-purple-100 text-sm transition"
                         title="Grant admin access"
                       >
