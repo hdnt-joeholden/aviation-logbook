@@ -48,9 +48,9 @@ export default function AircraftTypeModal({
   if (!isOpen) return null;
 
   // Generate preview of full aircraft type name
-  const fullTypeName = formData.manufacturer && formData.type_name
-    ? `${formData.manufacturer} ${formData.type_name}`
-    : formData.manufacturer || formData.type_name || '';
+  const fullTypeName = formData.manufacturer && formData.model
+    ? `${formData.manufacturer} ${formData.model}`
+    : formData.manufacturer || formData.model || '';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -135,8 +135,8 @@ export default function AircraftTypeModal({
             </label>
             <input
               type="text"
-              value={formData.type_name}
-              onChange={(e) => setFormData({...formData, type_name: e.target.value})}
+              value={formData.model}
+              onChange={(e) => setFormData({...formData, model: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
               placeholder="e.g., 787-8, 737-800, A320-200"
             />

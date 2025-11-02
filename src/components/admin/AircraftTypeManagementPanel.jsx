@@ -9,7 +9,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
   const [editingType, setEditingType] = useState(null);
   const [formData, setFormData] = useState({
     type_code: '',
-    type_name: '',
+    model: '',
     manufacturer: ''
   });
   const [loading, setLoading] = useState(false);
@@ -29,14 +29,14 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       setEditingType(type);
       setFormData({
         type_code: type.type_code,
-        type_name: type.type_name || '',
+        model: type.model || '',
         manufacturer: type.manufacturer || ''
       });
     } else {
       setEditingType(null);
       setFormData({
         type_code: '',
-        type_name: '',
+        model: '',
         manufacturer: ''
       });
     }
@@ -66,7 +66,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
           .from('aircraft_types')
           .update({
             type_code: formData.type_code.toUpperCase(),
-            type_name: formData.type_name || null,
+            model: formData.model || null,
             manufacturer: formData.manufacturer || null
           })
           .eq('id', editingType.id);
@@ -78,7 +78,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
           .from('aircraft_types')
           .insert([{
             type_code: formData.type_code.toUpperCase(),
-            type_name: formData.type_name || null,
+            model: formData.model || null,
             manufacturer: formData.manufacturer || null
           }]);
 
@@ -284,7 +284,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
                             {type.type_code}
                           </p>
                           <p className="text-sm text-gray-500">
-                            {type.type_name || 'No description'}
+                            {type.model || 'No description'}
                           </p>
                         </div>
                         <div className="flex gap-2">
