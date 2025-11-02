@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 export default function AircraftTypeModal({
@@ -9,9 +9,48 @@ export default function AircraftTypeModal({
   onSubmit,
   editingType,
   loading,
-  error
+  error,
+  aircraftTypes
 }) {
+  const [showCustomManufacturer, setShowCustomManufacturer] = useState(false);
+  const [customManufacturer, setCustomManufacturer] = useState('');
+
+  // Get unique manufacturers from existing aircraft types
+  const existingManufacturers = aircraftTypes
+    ? [...new Set(aircraftTypes
+        .map(t => t.manufacturer)
+        .filter(m => m && m.trim() !== ''))]
+        .sort()
+    : [];
+
+  // Check if current manufacturer is custom (not in the list)
+  useEffect(() => {
+    if (formData.manufacturer && !existingManufacturers.includes(formData.manufacturer)) {
+      setShowCustomManufacturer(true);
+      setCustomManufacturer(formData.manufacturer);
+    } else {
+      setShowCustomManufacturer(false);
+      setCustomManufacturer('');
+    }
+  }, [formData.manufacturer, isOpen]);
+
+  const handleManufacturerChange = (value) => {
+    if (value === '__custom__') {
+      setShowCustomManufacturer(true);
+      setCustomManufacturer('');
+      setFormData({...formData, manufacturer: ''});
+    } else {
+      setShowCustomManufacturer(false);
+      setFormData({...formData, manufacturer: value});
+    }
+  };
+
   if (!isOpen) return null;
+
+  // Generate preview of full aircraft type name
+  const fullTypeName = formData.manufacturer && formData.type_name
+    ? `${formData.manufacturer} ${formData.type_name}`
+    : formData.manufacturer || formData.type_name || '';
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -41,7 +80,7 @@ export default function AircraftTypeModal({
               value={formData.type_code}
               onChange={(e) => setFormData({...formData, type_code: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., B737, A320"
+              placeholder="e.g., B788, B737, A320"
               maxLength="50"
             />
             <p className="text-xs text-gray-500 mt-1">ICAO type code (will be converted to uppercase)</p>
@@ -49,29 +88,67 @@ export default function AircraftTypeModal({
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Type Name
+              Manufacturer
+            </label>
+            {!showCustomManufacturer ? (
+              <select
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleManufacturerChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Select manufacturer...</option>
+                {existingManufacturers.map((mfr) => (
+                  <option key={mfr} value={mfr}>{mfr}</option>
+                ))}
+                <option value="__custom__">+ Add new manufacturer</option>
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={customManufacturer}
+                  onChange={(e) => {
+                    setCustomManufacturer(e.target.value);
+                    setFormData({...formData, manufacturer: e.target.value});
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="e.g., Boeing, Airbus, Embraer"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCustomManufacturer(false);
+                    setFormData({...formData, manufacturer: ''});
+                  }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  ← Back to existing manufacturers
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Model
             </label>
             <input
               type="text"
               value={formData.type_name}
               onChange={(e) => setFormData({...formData, type_name: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., Boeing 737-800"
+              placeholder="e.g., 787-8, 737-800, A320-200"
             />
+            <p className="text-xs text-gray-500 mt-1">Model name/number (manufacturer will be prefixed automatically)</p>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Manufacturer
-            </label>
-            <input
-              type="text"
-              value={formData.manufacturer}
-              onChange={(e) => setFormData({...formData, manufacturer: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., Boeing, Airbus"
-            />
-          </div>
+          {fullTypeName && (
+            <div className="p-3 bg-blue-50 border border-blue-200 rounded-md">
+              <p className="text-xs text-blue-700 font-medium mb-1">Preview:</p>
+              <p className="text-sm text-blue-900">{fullTypeName}</p>
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
             <button

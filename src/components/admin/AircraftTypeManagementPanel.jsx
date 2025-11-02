@@ -320,6 +320,7 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         editingType={editingType}
         loading={loading}
         error={error}
+        aircraftTypes={aircraftTypes}
       />
 
       <ConfirmModal
