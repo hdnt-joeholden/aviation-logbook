@@ -981,9 +981,11 @@ export default function AviationLogbook() {
       // If in getting started flow, show completion screen
       if (showGettingStartedModal && gettingStartedStep === 'supervisor') {
         setGettingStartedStep('complete');
+        closeSupervisorModal(); // Call directly to bypass the check
+        setError('');
+      } else {
+        handleCloseSupervisorModal();
       }
-
-      handleCloseSupervisorModal();
     } catch (err) {
       setError(err.message);
     } finally {
