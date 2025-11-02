@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, User, Mail, Calendar, Shield, Clock, Key, Ban, CheckCircle, Save, AlertCircle } from 'lucide-react';
 
 export default function UserDetailsModal({
@@ -21,6 +21,20 @@ export default function UserDetailsModal({
     nationality: user?.nationality || ''
   });
   const [loading, setLoading] = useState(false);
+
+  // Update form data when user changes
+  useEffect(() => {
+    if (user) {
+      setFormData({
+        title: user.title || '',
+        forename: user.forename || '',
+        surname: user.surname || '',
+        email: user.email || '',
+        date_of_birth: user.date_of_birth || '',
+        nationality: user.nationality || ''
+      });
+    }
+  }, [user, isOpen]);
 
   if (!isOpen || !user) return null;
 
