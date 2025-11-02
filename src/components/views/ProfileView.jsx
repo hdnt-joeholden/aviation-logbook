@@ -84,10 +84,10 @@ export default function ProfileView({
                 Nationality <span className="text-red-500">*</span>
               </label>
               <select
-                value={profileFormData.nationality && ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish'].includes(profileFormData.nationality) ? profileFormData.nationality : 'Other'}
+                value={profileFormData.nationality && ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish', ''].includes(profileFormData.nationality) ? profileFormData.nationality : 'Other'}
                 onChange={(e) => {
                   if (e.target.value === 'Other') {
-                    setProfileFormData({...profileFormData, nationality: ''});
+                    setProfileFormData({...profileFormData, nationality: 'Other_Custom'});
                   } else {
                     setProfileFormData({...profileFormData, nationality: e.target.value});
                   }
@@ -115,14 +115,14 @@ export default function ProfileView({
               </select>
             </div>
           </div>
-          {(profileFormData.nationality && !['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish'].includes(profileFormData.nationality)) && (
+          {(profileFormData.nationality && !['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish', ''].includes(profileFormData.nationality)) && (
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Please specify your nationality <span className="text-red-500">*</span>
               </label>
               <input
                 type="text"
-                value={profileFormData.nationality || ''}
+                value={profileFormData.nationality === 'Other_Custom' ? '' : profileFormData.nationality}
                 onChange={(e) => setProfileFormData({...profileFormData, nationality: e.target.value})}
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                 placeholder="Enter your nationality"
