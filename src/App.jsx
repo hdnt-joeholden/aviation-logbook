@@ -977,12 +977,13 @@ export default function AviationLogbook() {
       }
 
       await reloadData();
-      handleCloseSupervisorModal();
 
       // If in getting started flow, show completion screen
       if (showGettingStartedModal && gettingStartedStep === 'supervisor') {
         setGettingStartedStep('complete');
       }
+
+      handleCloseSupervisorModal();
     } catch (err) {
       setError(err.message);
     } finally {
