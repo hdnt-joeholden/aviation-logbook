@@ -10,7 +10,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
   const [formData, setFormData] = useState({
     manufacturer: '',
     model: '',
-    variant: '',
     full_designation: ''
   });
   const [loading, setLoading] = useState(false);
@@ -31,7 +30,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
       setFormData({
         manufacturer: engine.manufacturer,
         model: engine.model,
-        variant: engine.variant || '',
         full_designation: engine.full_designation || ''
       });
     } else {
@@ -39,7 +37,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
       setFormData({
         manufacturer: '',
         model: '',
-        variant: '',
         full_designation: ''
       });
     }
@@ -59,6 +56,18 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
       return;
     }
 
+    // Check for duplicates (same manufacturer and model)
+    const duplicate = engines.find(
+      engine => engine.manufacturer === formData.manufacturer
+        && engine.model === formData.model
+        && (!editingEngine || engine.id !== editingEngine.id)
+    );
+
+    if (duplicate) {
+      setError(`Engine "${formData.manufacturer} ${formData.model}" already exists`);
+      return;
+    }
+
     setLoading(true);
     setError('');
 
@@ -70,7 +79,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
           .update({
             manufacturer: formData.manufacturer,
             model: formData.model,
-            variant: formData.variant || null,
             full_designation: formData.full_designation || null
           })
           .eq('id', editingEngine.id);
@@ -83,7 +91,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
           .insert([{
             manufacturer: formData.manufacturer,
             model: formData.model,
-            variant: formData.variant || null,
             full_designation: formData.full_designation || null
           }]);
 
@@ -295,20 +302,15 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
                 </div>
                 <div className="divide-y divide-gray-200">
                   {manufacturerEngines
-                    .sort((a, b) => {
-                      const aStr = `${a.model} ${a.variant || ''}`;
-                      const bStr = `${b.model} ${b.variant || ''}`;
-                      return aStr.localeCompare(bStr);
-                    })
+                    .sort((a, b) => a.model.localeCompare(b.model))
                     .map(engine => (
                       <div key={engine.id} className="p-4 hover:bg-gray-50 transition flex justify-between items-center">
                         <div>
                           <p className="font-medium text-gray-800">
-                            {engine.full_designation || `${engine.manufacturer} ${engine.model}${engine.variant ? `-${engine.variant}` : ''}`}
+                            {engine.full_designation || `${engine.manufacturer} ${engine.model}`}
                           </p>
                           <p className="text-sm text-gray-500">
-                            Model: {engine.model}
-                            {engine.variant && ` • Variant: ${engine.variant}`}
+                            {engine.model}
                           </p>
                         </div>
                         <div className="flex gap-2">
@@ -344,6 +346,7 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
         editingEngine={editingEngine}
         loading={loading}
         error={error}
+        engines={engines}
       />
 
       <ConfirmModal

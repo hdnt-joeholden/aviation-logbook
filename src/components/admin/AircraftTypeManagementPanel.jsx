@@ -67,6 +67,17 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       return;
     }
 
+    // Check for duplicates
+    const duplicate = aircraftTypes.find(
+      type => type.type_code.toUpperCase() === formData.type_code.toUpperCase()
+        && (!editingType || type.id !== editingType.id)
+    );
+
+    if (duplicate) {
+      setError(`Aircraft type with code "${formData.type_code.toUpperCase()}" already exists`);
+      return;
+    }
+
     setLoading(true);
     setError('');
 

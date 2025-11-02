@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 export default function EngineModal({
@@ -9,8 +9,41 @@ export default function EngineModal({
   onSubmit,
   editingEngine,
   loading,
-  error
+  error,
+  engines
 }) {
+  const [showCustomManufacturer, setShowCustomManufacturer] = useState(false);
+  const [customManufacturer, setCustomManufacturer] = useState('');
+
+  // Get unique manufacturers from existing engines
+  const existingManufacturers = engines
+    ? [...new Set(engines
+        .map(e => e.manufacturer)
+        .filter(m => m && m.trim() !== ''))].sort()
+    : [];
+
+  // Check if current manufacturer is custom (not in the list)
+  useEffect(() => {
+    if (formData.manufacturer && !existingManufacturers.includes(formData.manufacturer)) {
+      setShowCustomManufacturer(true);
+      setCustomManufacturer(formData.manufacturer);
+    } else {
+      setShowCustomManufacturer(false);
+      setCustomManufacturer('');
+    }
+  }, [formData.manufacturer, isOpen]);
+
+  const handleManufacturerChange = (value) => {
+    if (value === '__custom__') {
+      setShowCustomManufacturer(true);
+      setCustomManufacturer('');
+      setFormData({...formData, manufacturer: ''});
+    } else {
+      setShowCustomManufacturer(false);
+      setFormData({...formData, manufacturer: value});
+    }
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -36,13 +69,43 @@ export default function EngineModal({
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Manufacturer <span className="text-red-500">*</span>
             </label>
-            <input
-              type="text"
-              value={formData.manufacturer}
-              onChange={(e) => setFormData({...formData, manufacturer: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., Rolls-Royce, GE, Pratt & Whitney"
-            />
+            {!showCustomManufacturer ? (
+              <select
+                value={formData.manufacturer || ''}
+                onChange={(e) => handleManufacturerChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+              >
+                <option value="">Select manufacturer...</option>
+                {existingManufacturers.map((mfr) => (
+                  <option key={mfr} value={mfr}>{mfr}</option>
+                ))}
+                <option value="__custom__">+ Add new manufacturer</option>
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={customManufacturer}
+                  onChange={(e) => {
+                    setCustomManufacturer(e.target.value);
+                    setFormData({...formData, manufacturer: e.target.value});
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
+                  placeholder="e.g., Rolls-Royce, GE, Pratt & Whitney"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCustomManufacturer(false);
+                    setFormData({...formData, manufacturer: ''});
+                  }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  ← Back to existing manufacturers
+                </button>
+              </div>
+            )}
             <p className="text-xs text-gray-500 mt-1">The engine manufacturer name</p>
           </div>
 
@@ -55,23 +118,9 @@ export default function EngineModal({
               value={formData.model}
               onChange={(e) => setFormData({...formData, model: e.target.value})}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., Trent, GEnx, LEAP"
+              placeholder="e.g., Trent 1000-J, GEnx-1B70, LEAP-7B27"
             />
-            <p className="text-xs text-gray-500 mt-1">The engine model/family name</p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Variant
-            </label>
-            <input
-              type="text"
-              value={formData.variant}
-              onChange={(e) => setFormData({...formData, variant: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500"
-              placeholder="e.g., 1000-J, 1B70, 7B27"
-            />
-            <p className="text-xs text-gray-500 mt-1">Specific variant/version (optional but recommended)</p>
+            <p className="text-xs text-gray-500 mt-1">The complete engine model including variant (e.g., Trent 1000-J)</p>
           </div>
 
           <div>
@@ -94,7 +143,7 @@ export default function EngineModal({
             <p className="text-sm text-gray-700">
               <span className="font-medium">Preview:</span>{' '}
               {formData.full_designation ||
-                `${formData.manufacturer || '...'} ${formData.model || '...'}${formData.variant ? `-${formData.variant}` : ''}`}
+                `${formData.manufacturer || '...'} ${formData.model || '...'}`}
             </p>
           </div>
 
