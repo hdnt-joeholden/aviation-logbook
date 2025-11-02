@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, ShieldOff, Users, Search, Mail, Calendar, UserPlus, X, Send, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Shield, ShieldOff, Users, Search, Mail, Calendar, UserPlus, X, Send, Clock, CheckCircle, XCircle, Ban } from 'lucide-react';
 import { supabase } from '../../lib/supabaseClient';
 import ConfirmModal from '../modals/ConfirmModal';
+import UserDetailsModal from '../modals/UserDetailsModal';
 
 export default function UserManagementPanel({ currentUserId }) {
   const [users, setUsers] = useState([]);
@@ -25,6 +26,8 @@ export default function UserManagementPanel({ currentUserId }) {
     confirmText: 'Confirm',
     onConfirm: () => {}
   });
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [showUserDetailsModal, setShowUserDetailsModal] = useState(false);
 
   useEffect(() => {
     loadUsers();
@@ -41,9 +44,30 @@ export default function UserManagementPanel({ currentUserId }) {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setUsers(data || []);
+
+      // Enrich users with auth metadata (last sign in)
+      const enrichedUsers = await Promise.all(
+        (data || []).map(async (user) => {
+          try {
+            const { data: authData, error: authError } = await supabase.functions.invoke(
+              'get-user-auth-data',
+              {
+                body: { user_id: user.id }
+              }
+            );
+
+            if (!authError && authData) {
+              return { ...user, last_sign_in_at: authData.last_sign_in_at };
+            }
+          } catch (err) {
+            // If auth data fetch fails, just continue without it
+          }
+          return user;
+        })
+      );
+
+      setUsers(enrichedUsers);
     } catch (err) {
-      console.error('Error loading users:', err);
       setError('Failed to load users');
     } finally {
       setLoading(false);
@@ -63,7 +87,6 @@ export default function UserManagementPanel({ currentUserId }) {
       if (error) throw error;
       setInvites(data || []);
     } catch (err) {
-      console.error('Error loading invites:', err);
       // Don't show error if table doesn't exist yet
     }
   };
@@ -127,7 +150,6 @@ export default function UserManagementPanel({ currentUserId }) {
         });
 
         if (functionError) {
-          console.error('Email function error:', functionError);
           // Don't fail the whole operation if email fails
           setSuccess(
             `Invite created for ${inviteForm.email}. Email service unavailable - please share this link manually: ${signupUrl}`
@@ -139,7 +161,6 @@ export default function UserManagementPanel({ currentUserId }) {
           );
         }
       } catch (emailError) {
-        console.error('Failed to send invite email:', emailError);
         // Provide fallback link
         setSuccess(
           `Invite created for ${inviteForm.email}. Share this signup link with them: ${signupUrl}`
@@ -156,7 +177,6 @@ export default function UserManagementPanel({ currentUserId }) {
       // Clear success message after 5 seconds
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
-      console.error('Error inviting user:', err);
 
       // Check if it's a duplicate invite error
       if (err.code === '23505' || err.message?.includes('duplicate') || err.message?.includes('unique')) {
@@ -193,7 +213,6 @@ export default function UserManagementPanel({ currentUserId }) {
             .eq('account_status', 'pending');
 
           if (deleteError) {
-            console.warn('Error deleting pending user:', deleteError);
             // Don't throw - invite was cancelled, that's the main thing
           }
 
@@ -206,7 +225,6 @@ export default function UserManagementPanel({ currentUserId }) {
 
           setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
-          console.error('Error cancelling invite:', err);
           setError(err.message || 'Failed to cancel invite');
         }
       }
@@ -241,7 +259,6 @@ export default function UserManagementPanel({ currentUserId }) {
 
           setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
-          console.error('Error removing pending user:', err);
           setError(err.message || 'Failed to remove pending user');
         }
       }
@@ -277,11 +294,116 @@ export default function UserManagementPanel({ currentUserId }) {
           // Clear success message after 3 seconds
           setTimeout(() => setSuccess(''), 3000);
         } catch (err) {
-          console.error('Error updating admin status:', err);
           setError(err.message || 'Failed to update admin status');
         }
       }
     });
+  };
+
+  const handleOpenUserDetails = (user) => {
+    setSelectedUser(user);
+    setShowUserDetailsModal(true);
+  };
+
+  const handleSaveUserDetails = async (userId, formData) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          title: formData.title,
+          forename: formData.forename,
+          surname: formData.surname,
+          date_of_birth: formData.date_of_birth,
+          nationality: formData.nationality
+        })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setSuccess('User details updated successfully');
+      await loadUsers();
+
+      // Update selected user
+      const updatedUser = users.find(u => u.id === userId);
+      if (updatedUser) {
+        setSelectedUser({ ...updatedUser, ...formData });
+      }
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Failed to update user details');
+    }
+  };
+
+  const handleSuspendUser = async (userId) => {
+    setConfirmModal({
+      isOpen: true,
+      title: 'Suspend User',
+      message: 'Are you sure you want to suspend this user? They will be locked out of their account.',
+      variant: 'danger',
+      showCancel: true,
+      confirmText: 'Suspend',
+      onConfirm: async () => {
+        try {
+          const { error } = await supabase
+            .from('profiles')
+            .update({ account_status: 'suspended' })
+            .eq('id', userId);
+
+          if (error) throw error;
+
+          setSuccess('User suspended successfully');
+          await loadUsers();
+
+          // Update selected user
+          if (selectedUser && selectedUser.id === userId) {
+            setSelectedUser({ ...selectedUser, account_status: 'suspended' });
+          }
+
+          setTimeout(() => setSuccess(''), 3000);
+        } catch (err) {
+          setError(err.message || 'Failed to suspend user');
+        }
+      }
+    });
+  };
+
+  const handleActivateUser = async (userId) => {
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ account_status: 'active' })
+        .eq('id', userId);
+
+      if (error) throw error;
+
+      setSuccess('User activated successfully');
+      await loadUsers();
+
+      // Update selected user
+      if (selectedUser && selectedUser.id === userId) {
+        setSelectedUser({ ...selectedUser, account_status: 'active' });
+      }
+
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Failed to activate user');
+    }
+  };
+
+  const handleSendPasswordReset = async (email) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`
+      });
+
+      if (error) throw error;
+
+      setSuccess('Password reset email sent successfully');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Failed to send password reset email');
+    }
   };
 
   // Filter users based on search term
@@ -294,10 +416,11 @@ export default function UserManagementPanel({ currentUserId }) {
     );
   });
 
-  // Separate admins, regular users, and pending users
+  // Separate admins, regular users, pending users, and suspended users
   const adminUsers = filteredUsers.filter(u => u.is_admin && u.account_status === 'active');
   const regularUsers = filteredUsers.filter(u => !u.is_admin && u.account_status === 'active');
   const pendingUsers = filteredUsers.filter(u => u.account_status === 'pending');
+  const suspendedUsers = filteredUsers.filter(u => u.account_status === 'suspended');
 
   // Filter pending invites - exclude those that already have a pending user (to avoid duplicates)
   const pendingUserEmails = pendingUsers.map(u => u.email?.toLowerCase());
@@ -482,10 +605,13 @@ export default function UserManagementPanel({ currentUserId }) {
                 {adminUsers.map(user => (
                   <div key={user.id} className="p-4 hover:bg-gray-50 transition">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleOpenUserDetails(user)}
+                      >
                         <div className="flex items-center gap-3 mb-2">
                           <div>
-                            <p className="font-semibold text-gray-900">
+                            <p className="font-semibold text-gray-900 hover:text-purple-600 transition">
                               {user.title} {user.forename} {user.surname}
                             </p>
                             <p className="text-sm text-gray-500 flex items-center gap-1">
@@ -539,9 +665,12 @@ export default function UserManagementPanel({ currentUserId }) {
                 {regularUsers.map(user => (
                   <div key={user.id} className="p-4 hover:bg-gray-50 transition">
                     <div className="flex justify-between items-start">
-                      <div className="flex-1">
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleOpenUserDetails(user)}
+                      >
                         <div className="mb-2">
-                          <p className="font-medium text-gray-900">
+                          <p className="font-medium text-gray-900 hover:text-blue-600 transition">
                             {user.title} {user.forename} {user.surname}
                           </p>
                           <p className="text-sm text-gray-500 flex items-center gap-1">
@@ -564,6 +693,61 @@ export default function UserManagementPanel({ currentUserId }) {
                         <Shield size={16} />
                         Make Admin
                       </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Suspended Users */}
+          {suspendedUsers.length > 0 && (
+            <div className="bg-white border border-red-200 rounded-lg overflow-hidden">
+              <div className="bg-red-50 px-4 py-3 border-b border-red-200">
+                <h3 className="font-semibold text-red-900 flex items-center gap-2">
+                  <Ban size={18} />
+                  Suspended Users ({suspendedUsers.length})
+                </h3>
+                <p className="text-xs text-red-700 mt-1">
+                  These users are locked out of their accounts
+                </p>
+              </div>
+              <div className="divide-y divide-gray-200">
+                {suspendedUsers.map(user => (
+                  <div key={user.id} className="p-4 hover:bg-gray-50 transition bg-red-50/30">
+                    <div className="flex justify-between items-start">
+                      <div
+                        className="flex-1 cursor-pointer"
+                        onClick={() => handleOpenUserDetails(user)}
+                      >
+                        <div className="mb-2">
+                          <div className="flex items-center gap-2">
+                            <p className="font-medium text-gray-900 hover:text-red-600 transition">
+                              {user.title} {user.forename} {user.surname}
+                            </p>
+                            {user.is_admin && (
+                              <span className="inline-block bg-purple-100 text-purple-700 text-xs px-2 py-0.5 rounded flex items-center gap-1">
+                                <Shield size={10} />
+                                Admin
+                              </span>
+                            )}
+                            <span className="inline-block bg-red-100 text-red-700 text-xs px-2 py-0.5 rounded flex items-center gap-1">
+                              <Ban size={10} />
+                              Suspended
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-500 flex items-center gap-1 mt-1">
+                            <Mail size={14} />
+                            {user.email}
+                          </p>
+                        </div>
+                        <div className="flex gap-4 text-xs text-gray-500">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} />
+                            Joined {new Date(user.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -687,6 +871,17 @@ export default function UserManagementPanel({ currentUserId }) {
         variant={confirmModal.variant}
         showCancel={confirmModal.showCancel}
         confirmText={confirmModal.confirmText}
+      />
+
+      <UserDetailsModal
+        isOpen={showUserDetailsModal}
+        onClose={() => setShowUserDetailsModal(false)}
+        user={selectedUser}
+        onSave={handleSaveUserDetails}
+        onSuspend={handleSuspendUser}
+        onActivate={handleActivateUser}
+        onSendPasswordReset={handleSendPasswordReset}
+        currentUserId={currentUserId}
       />
     </div>
   );

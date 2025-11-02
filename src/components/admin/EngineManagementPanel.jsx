@@ -93,7 +93,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
       await onReloadData();
       closeModal();
     } catch (err) {
-      console.error('Error saving engine:', err);
       setError(err.message || 'Failed to save engine');
     } finally {
       setLoading(false);
@@ -101,9 +100,7 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
   };
 
   const handleDelete = async (engineId) => {
-    console.log('🔴 handleDelete CALLED with engineId:', engineId);
     try {
-      console.log('🔴 Starting usage checks...');
       // Check if any user aircraft are using this engine
       const { data: aircraftData, count: aircraftCount, error: countError } = await supabase
         .from('user_aircraft')
@@ -111,11 +108,9 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
         .eq('engine_id', engineId);
 
       if (countError) {
-        console.error('Error checking aircraft count:', countError);
         throw countError;
       }
 
-      console.log('Aircraft check result:', { aircraftData, aircraftCount });
 
       // Also check if any aircraft type links use this engine
       const { data: linkData, count: linkCount, error: linkCountError } = await supabase
@@ -124,18 +119,14 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
         .eq('engine_id', engineId);
 
       if (linkCountError) {
-        console.error('Error checking link count:', linkCountError);
         throw linkCountError;
       }
 
-      console.log('Link check result:', { linkData, linkCount });
-      console.log('Usage check:', { aircraftCount, linkCount, aircraftDataLength: aircraftData?.length, linkDataLength: linkData?.length, engineId });
 
       // Use count if available, otherwise use data array length
       const actualAircraftCount = aircraftCount !== null ? aircraftCount : (aircraftData?.length || 0);
       const actualLinkCount = linkCount !== null ? linkCount : (linkData?.length || 0);
 
-      console.log('Actual counts:', { actualAircraftCount, actualLinkCount });
 
       const totalUsage = actualAircraftCount + actualLinkCount;
 
@@ -194,7 +185,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
         confirmText: 'Delete',
         onConfirm: async () => {
           try {
-            console.log('Attempting to delete engine:', engineId);
 
             const { data: deleteData, error: deleteError } = await supabase
               .from('engines')
@@ -202,13 +192,10 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
               .eq('id', engineId)
               .select();
 
-            console.log('Delete result:', { deleteData, deleteError });
 
             if (deleteError) throw deleteError;
 
-            console.log('Reloading data...');
             await onReloadData();
-            console.log('Data reloaded');
 
             setConfirmModal({
               isOpen: true,
@@ -220,7 +207,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
               onConfirm: () => {}
             });
           } catch (err) {
-            console.error('Error deleting engine:', err);
 
             // Check if it's a foreign key constraint error
             if (err.code === '23503' && err.message?.includes('user_aircraft')) {
@@ -248,7 +234,6 @@ export default function EngineManagementPanel({ engines, onReloadData }) {
         }
       });
     } catch (err) {
-      console.error('Error checking engine usage:', err);
       setConfirmModal({
         isOpen: true,
         title: 'Error',

@@ -101,7 +101,6 @@ export function useLogbookData(user) {
       setEmploymentHistory(employmentData || []);
 
     } catch (err) {
-      console.error('Error loading data:', err);
       throw err;
     } finally {
       setLoading(false);

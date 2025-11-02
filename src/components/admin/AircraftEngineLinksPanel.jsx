@@ -70,7 +70,6 @@ export default function AircraftEngineLinksPanel({
       setIsCommon(false);
       await onReloadData();
     } catch (err) {
-      console.error('Error adding link:', err);
       setError(err.message || 'Failed to add link');
     } finally {
       setLoading(false);
@@ -96,7 +95,6 @@ export default function AircraftEngineLinksPanel({
 
           await onReloadData();
         } catch (err) {
-          console.error('Error deleting link:', err);
           setConfirmModal({
             isOpen: true,
             title: 'Error',
@@ -122,7 +120,6 @@ export default function AircraftEngineLinksPanel({
 
       await onReloadData();
     } catch (err) {
-      console.error('Error updating link:', err);
       setConfirmModal({
         isOpen: true,
         title: 'Error',

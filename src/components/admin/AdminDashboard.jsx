@@ -85,7 +85,6 @@ export default function AdminDashboard({ engines, aircraftTypes, aircraftEngines
         recentActivity: recentData || []
       });
     } catch (err) {
-      console.error('Error loading stats:', err);
     } finally {
       setLoading(false);
     }

@@ -15,7 +15,8 @@
       "Bash(taskkill:*)",
       "Bash(netstat:*)",
       "Bash(findstr:*)",
-      "Bash(del nul 2)"
+      "Bash(del nul 2)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

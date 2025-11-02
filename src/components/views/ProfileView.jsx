@@ -1,5 +1,6 @@
-import React from 'react';
-import { Loader2, Plus, Edit2, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Loader2, Plus, Edit2, Trash2, Key } from 'lucide-react';
+import ChangePasswordModal from '../modals/ChangePasswordModal';
 
 export default function ProfileView({
   profileFormData,
@@ -13,10 +14,20 @@ export default function ProfileView({
   onDeleteEmployment,
   loading
 }) {
+  const [showChangePassword, setShowChangePassword] = useState(false);
   return (
     <div className="space-y-6">
       <div className="bg-white rounded-lg shadow-sm p-6">
-        <h2 className="text-xl font-semibold text-gray-800 mb-6">Personal Information</h2>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-xl font-semibold text-gray-800">Personal Information</h2>
+          <button
+            onClick={() => setShowChangePassword(true)}
+            className="flex items-center gap-2 px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
+          >
+            <Key size={16} />
+            Change Password
+          </button>
+        </div>
         <div className="space-y-4">
           <div className="grid grid-cols-3 gap-4">
             <div>
@@ -304,6 +315,11 @@ export default function ProfileView({
           </div>
         )}
       </div>
+
+      <ChangePasswordModal
+        isOpen={showChangePassword}
+        onClose={() => setShowChangePassword(false)}
+      />
     </div>
   );
 }

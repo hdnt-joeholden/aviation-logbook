@@ -88,7 +88,6 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
       await onReloadData();
       closeModal();
     } catch (err) {
-      console.error('Error saving aircraft type:', err);
       setError(err.message || 'Failed to save aircraft type');
     } finally {
       setLoading(false);
@@ -104,7 +103,6 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         .eq('aircraft_type_id', typeId);
 
       if (countError) {
-        console.error('Error checking aircraft count:', countError);
         throw countError;
       }
 
@@ -115,11 +113,9 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         .eq('aircraft_type_id', typeId);
 
       if (linkCountError) {
-        console.error('Error checking link count:', linkCountError);
         throw linkCountError;
       }
 
-      console.log('Usage check:', { aircraftCount, linkCount, typeId });
 
       const totalUsage = (aircraftCount || 0) + (linkCount || 0);
 
@@ -183,7 +179,6 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         confirmText: 'Delete',
         onConfirm: async () => {
           try {
-            console.log('Attempting to delete aircraft type:', typeId);
 
             const { data: deleteData, error: deleteError } = await supabase
               .from('aircraft_types')
@@ -191,13 +186,10 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
               .eq('id', typeId)
               .select();
 
-            console.log('Delete result:', { deleteData, deleteError });
 
             if (deleteError) throw deleteError;
 
-            console.log('Reloading data...');
             await onReloadData();
-            console.log('Data reloaded');
 
             setConfirmModal({
               isOpen: true,
@@ -209,7 +201,6 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
               onConfirm: () => {}
             });
           } catch (err) {
-            console.error('Error deleting aircraft type:', err);
             setConfirmModal({
               isOpen: true,
               title: 'Error',
@@ -223,7 +214,6 @@ export default function AircraftTypeManagementPanel({ aircraftTypes, onReloadDat
         }
       });
     } catch (err) {
-      console.error('Error checking aircraft type usage:', err);
       setConfirmModal({
         isOpen: true,
         title: 'Error',

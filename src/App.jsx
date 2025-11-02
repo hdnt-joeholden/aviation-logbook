@@ -14,6 +14,7 @@ import Alert from './components/common/Alert';
 import ConfirmDialog from './components/common/ConfirmDialog';
 import LoginForm from './components/auth/LoginForm';
 import RegisterForm from './components/auth/RegisterForm';
+import PasswordResetForm from './components/auth/PasswordResetForm';
 import Header from './components/layout/Header';
 import Navigation from './components/layout/Navigation';
 
@@ -23,6 +24,7 @@ import EmploymentModal from './components/modals/EmploymentModal';
 import EntryModal from './components/modals/EntryModal';
 import SupervisorModal from './components/modals/SupervisorModal';
 import AircraftModal from './components/modals/AircraftModal';
+import ForgotPasswordModal from './components/modals/ForgotPasswordModal';
 
 // Views
 import DashboardView from './components/views/DashboardView';
@@ -69,6 +71,8 @@ export default function AviationLogbook() {
   } = useModalState();
 
   const [showLogin, setShowLogin] = useState(true);
+  const [showPasswordReset, setShowPasswordReset] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [currentView, setCurrentView] = useState('dashboard');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -105,6 +109,15 @@ export default function AviationLogbook() {
       setInviteEmail(invite);
       setRegisterEmail(invite);
       setShowLogin(false); // Show registration form
+    }
+  }, []);
+
+  // Check for password reset token in URL hash
+  React.useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    if (type === 'recovery') {
+      setShowPasswordReset(true);
     }
   }, []);
 
@@ -220,13 +233,6 @@ export default function AviationLogbook() {
 
   // Check if profile is complete - if not, force user to complete it
   React.useEffect(() => {
-    console.log('Profile completion effect triggered:', {
-      hasUser: !!user,
-      hasProfile: !!profile,
-      dataLoading: dataLoading,
-      addressCount: addresses?.length || 0
-    });
-
     if (user && profile && !dataLoading) {
       const isProfileComplete =
         profile.title &&
@@ -236,22 +242,9 @@ export default function AviationLogbook() {
         profile.nationality &&
         addresses?.some(addr => addr.is_current); // Must have a current address
 
-      console.log('Profile completion check:', {
-        hasTitle: !!profile.title,
-        hasForename: !!profile.forename,
-        hasSurname: !!profile.surname,
-        hasDOB: !!profile.date_of_birth,
-        hasNationality: !!profile.nationality,
-        hasCurrentAddress: addresses?.some(addr => addr.is_current),
-        isComplete: isProfileComplete
-      });
-
       if (!isProfileComplete) {
-        console.log('Profile incomplete - showing modal');
         setShowProfileCompletionModal(true);
         setCurrentView('profile'); // Force them to profile view
-      } else {
-        console.log('Profile is complete - no modal needed');
       }
     }
   }, [user, profile, addresses, dataLoading]);
@@ -313,6 +306,20 @@ export default function AviationLogbook() {
     try {
       setError('');
       setLoading(true);
+
+      // Check if email already exists (for non-pending accounts)
+      const { data: existingProfile } = await supabase
+        .from('profiles')
+        .select('email, account_status')
+        .eq('email', registerEmail.toLowerCase())
+        .neq('account_status', 'pending')
+        .maybeSingle();
+
+      if (existingProfile) {
+        setError('An account with this email already exists. Please try logging in instead.');
+        setLoading(false);
+        return;
+      }
 
       // If registering via invite, validate the invite
       let inviteData = null;
@@ -1046,7 +1053,16 @@ export default function AviationLogbook() {
           {error && <Alert type="error" message={error} onClose={() => setError('')} />}
           {success && <Alert type="success" message={success} onClose={() => setSuccess('')} />}
 
-          {showLogin ? (
+          {showPasswordReset ? (
+            <PasswordResetForm
+              onBackToLogin={() => {
+                setShowPasswordReset(false);
+                setShowLogin(true);
+                setError('');
+                setSuccess('');
+              }}
+            />
+          ) : showLogin ? (
             <LoginForm
               email={loginEmail}
               setEmail={setLoginEmail}
@@ -1058,6 +1074,7 @@ export default function AviationLogbook() {
                 setError('');
                 setSuccess('');
               }}
+              onForgotPassword={() => setShowForgotPassword(true)}
               loading={loading}
             />
           ) : (
@@ -1081,6 +1098,11 @@ export default function AviationLogbook() {
             />
           )}
         </div>
+
+        <ForgotPasswordModal
+          isOpen={showForgotPassword}
+          onClose={() => setShowForgotPassword(false)}
+        />
       </div>
     );
   }
