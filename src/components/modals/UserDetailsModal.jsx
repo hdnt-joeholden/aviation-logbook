@@ -232,30 +232,67 @@ export default function UserDetailsModal({
                   />
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    value={formData.date_of_birth}
+                    onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Nationality
+                  </label>
+                  <select
+                    value={!formData.nationality || formData.nationality === '' ? '' : ['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish'].includes(formData.nationality) ? formData.nationality : 'Other'}
+                    onChange={(e) => {
+                      if (e.target.value === 'Other') {
+                        setFormData({ ...formData, nationality: 'Other_Custom' });
+                      } else {
+                        setFormData({ ...formData, nationality: e.target.value });
+                      }
+                    }}
+                    className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">Select...</option>
+                    <option value="British">British</option>
+                    <option value="Irish">Irish</option>
+                    <option value="American">American</option>
+                    <option value="Canadian">Canadian</option>
+                    <option value="Australian">Australian</option>
+                    <option value="New Zealand">New Zealand</option>
+                    <option value="French">French</option>
+                    <option value="German">German</option>
+                    <option value="Spanish">Spanish</option>
+                    <option value="Italian">Italian</option>
+                    <option value="Dutch">Dutch</option>
+                    <option value="Belgian">Belgian</option>
+                    <option value="Swiss">Swiss</option>
+                    <option value="Austrian">Austrian</option>
+                    <option value="Polish">Polish</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+
+                {(formData.nationality && !['British', 'Irish', 'American', 'Canadian', 'Australian', 'New Zealand', 'French', 'German', 'Spanish', 'Italian', 'Dutch', 'Belgian', 'Swiss', 'Austrian', 'Polish', ''].includes(formData.nationality)) && (
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Date of Birth
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.date_of_birth}
-                      onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                      className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Nationality
+                      Please specify nationality
                     </label>
                     <input
                       type="text"
-                      value={formData.nationality}
+                      value={formData.nationality === 'Other_Custom' ? '' : formData.nationality}
                       onChange={(e) => setFormData({ ...formData, nationality: e.target.value })}
                       className="w-full px-3 py-2 text-sm border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter nationality"
                     />
                   </div>
-                </div>
+                )}
 
                 <div className="flex justify-end gap-2 pt-2">
                   <button
