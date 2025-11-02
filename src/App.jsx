@@ -178,11 +178,7 @@ export default function AviationLogbook() {
     registration: '',
     aircraft_type_id: '',
     engine_id: '',
-    manufacturer: '',
-    serial_number: '',
-    year_of_manufacture: '',
-    notes: '',
-    is_active: true
+    airline: ''
   });
 
   // Aircraft modal state
@@ -706,11 +702,7 @@ export default function AviationLogbook() {
         registration: aircraft.registration,
         aircraft_type_id: aircraft.aircraft_type_id,
         engine_id: aircraft.engine_id || '',
-        manufacturer: aircraft.manufacturer || '',
-        serial_number: aircraft.serial_number || '',
-        year_of_manufacture: aircraft.year_of_manufacture || '',
-        notes: aircraft.notes || '',
-        is_active: aircraft.is_active
+        airline: aircraft.airline || ''
       });
     } else {
       setEditingAircraft(null);
@@ -718,11 +710,7 @@ export default function AviationLogbook() {
         registration: '',
         aircraft_type_id: '',
         engine_id: '',
-        manufacturer: '',
-        serial_number: '',
-        year_of_manufacture: '',
-        notes: '',
-        is_active: true
+        airline: ''
       });
     }
     setShowAircraftModal(true);
@@ -752,11 +740,7 @@ export default function AviationLogbook() {
         registration: aircraftFormData.registration.toUpperCase(),
         aircraft_type_id: aircraftFormData.aircraft_type_id,
         engine_id: aircraftFormData.engine_id,
-        manufacturer: aircraftFormData.manufacturer || null,
-        serial_number: aircraftFormData.serial_number || null,
-        year_of_manufacture: aircraftFormData.year_of_manufacture ? parseInt(aircraftFormData.year_of_manufacture) : null,
-        notes: aircraftFormData.notes || null,
-        is_active: aircraftFormData.is_active,
+        airline: aircraftFormData.airline || null,
         user_id: user.id
       };
 
@@ -1241,6 +1225,7 @@ export default function AviationLogbook() {
         aircraftTypes={aircraftTypes}
         engines={engines}
         aircraftEngines={aircraftEngines}
+        employmentHistory={employmentHistory}
       />
 
       <SupervisorModal

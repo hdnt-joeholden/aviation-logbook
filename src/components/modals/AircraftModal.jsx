@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { X, Loader2 } from 'lucide-react';
 
 export default function AircraftModal({
@@ -12,8 +12,41 @@ export default function AircraftModal({
   error,
   aircraftTypes,
   engines,
-  aircraftEngines
+  aircraftEngines,
+  employmentHistory
 }) {
+  const [showCustomAirline, setShowCustomAirline] = useState(false);
+  const [customAirline, setCustomAirline] = useState('');
+
+  // Get unique airlines from employment history
+  const existingAirlines = employmentHistory
+    ? [...new Set(employmentHistory
+        .map(e => e.company_name)
+        .filter(c => c && c.trim() !== ''))].sort()
+    : [];
+
+  // Check if current airline is custom (not in the list)
+  useEffect(() => {
+    if (formData.airline && !existingAirlines.includes(formData.airline)) {
+      setShowCustomAirline(true);
+      setCustomAirline(formData.airline);
+    } else {
+      setShowCustomAirline(false);
+      setCustomAirline('');
+    }
+  }, [formData.airline, isOpen]);
+
+  const handleAirlineChange = (value) => {
+    if (value === '__custom__') {
+      setShowCustomAirline(true);
+      setCustomAirline('');
+      setFormData({...formData, airline: ''});
+    } else {
+      setShowCustomAirline(false);
+      setFormData({...formData, airline: value});
+    }
+  };
+
   if (!isOpen) return null;
 
   // Compute compatible engines based on selected aircraft type
@@ -99,6 +132,7 @@ export default function AircraftModal({
               {aircraftTypes.map(type => (
                 <option key={type.id} value={type.id}>
                   {type.type_code}
+                  {type.manufacturer && type.model && ` - ${type.manufacturer} ${type.model}`}
                 </option>
               ))}
             </select>
@@ -121,7 +155,7 @@ export default function AircraftModal({
               </option>
               {compatibleEngines.map(engine => (
                 <option key={engine.id} value={engine.id}>
-                  {engine.full_designation || `${engine.manufacturer} ${engine.model}${engine.variant ? `-${engine.variant}` : ''}`}
+                  {engine.full_designation || `${engine.manufacturer} ${engine.model}`}
                   {engine.is_common ? ' (Common)' : ''}
                 </option>
               ))}
@@ -133,72 +167,48 @@ export default function AircraftModal({
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Manufacturer
-              </label>
-              <input
-                type="text"
-                value={formData.manufacturer}
-                onChange={(e) => setFormData({...formData, manufacturer: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="Airbus, Boeing, etc."
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Serial Number (MSN)
-              </label>
-              <input
-                type="text"
-                value={formData.serial_number}
-                onChange={(e) => setFormData({...formData, serial_number: e.target.value})}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                placeholder="12345"
-              />
-            </div>
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              Year of Manufacture
+              Airline
             </label>
-            <input
-              type="number"
-              value={formData.year_of_manufacture}
-              onChange={(e) => setFormData({...formData, year_of_manufacture: e.target.value})}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="2020"
-              min="1900"
-              max={new Date().getFullYear()}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Notes
-            </label>
-            <textarea
-              value={formData.notes}
-              onChange={(e) => setFormData({...formData, notes: e.target.value})}
-              rows={3}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              placeholder="Additional information about this aircraft..."
-            />
-          </div>
-
-          <div className="flex items-center">
-            <input
-              type="checkbox"
-              id="is_active"
-              checked={formData.is_active}
-              onChange={(e) => setFormData({...formData, is_active: e.target.checked})}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <label htmlFor="is_active" className="ml-2 text-sm text-gray-700">
-              Currently active in fleet
-            </label>
+            {!showCustomAirline ? (
+              <select
+                value={formData.airline || ''}
+                onChange={(e) => handleAirlineChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Select airline...</option>
+                {existingAirlines.map((airline) => (
+                  <option key={airline} value={airline}>{airline}</option>
+                ))}
+                <option value="__custom__">+ Add new airline</option>
+              </select>
+            ) : (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  value={customAirline}
+                  onChange={(e) => {
+                    setCustomAirline(e.target.value);
+                    setFormData({...formData, airline: e.target.value});
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="e.g., British Airways, EasyJet"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowCustomAirline(false);
+                    setFormData({...formData, airline: ''});
+                  }}
+                  className="text-xs text-blue-600 hover:underline"
+                >
+                  ← Back to existing airlines
+                </button>
+              </div>
+            )}
+            <p className="text-xs text-gray-500 mt-1">Airline or operator of this aircraft</p>
           </div>
 
           <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
