@@ -1477,7 +1477,7 @@ export default function AviationLogbook() {
       )}
 
       {/* Getting Started Flow Modal */}
-      {showGettingStartedModal && (
+      {showGettingStartedModal && !showAircraftModal && !showSupervisorModal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full">
             <div className="p-6 border-b border-gray-200 bg-blue-50">
