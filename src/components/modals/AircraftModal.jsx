@@ -38,19 +38,6 @@ export default function AircraftModal({
     }
   }, [formData.airline, existingAirlines, isOpen]);
 
-  const handleAirlineChange = (value) => {
-    if (value === '__custom__') {
-      setShowCustomAirline(true);
-      setCustomAirline('');
-      setFormData({...formData, airline: ''});
-    } else {
-      setShowCustomAirline(false);
-      setFormData({...formData, airline: value});
-    }
-  };
-
-  if (!isOpen) return null;
-
   // Compute compatible engines based on selected aircraft type
   const compatibleEngines = useMemo(() => {
     if (!formData.aircraft_type_id) return [];
@@ -80,6 +67,19 @@ export default function AircraftModal({
         return `${a.manufacturer} ${a.model}`.localeCompare(`${b.manufacturer} ${b.model}`);
       });
   }, [formData.aircraft_type_id, engines, aircraftEngines]);
+
+  const handleAirlineChange = (value) => {
+    if (value === '__custom__') {
+      setShowCustomAirline(true);
+      setCustomAirline('');
+      setFormData({...formData, airline: ''});
+    } else {
+      setShowCustomAirline(false);
+      setFormData({...formData, airline: value});
+    }
+  };
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
