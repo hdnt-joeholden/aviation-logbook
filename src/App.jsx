@@ -1136,14 +1136,14 @@ export default function AviationLogbook() {
       {/* Profile Completion Modal - Prevents navigation until profile is complete */}
       {showProfileCompletionModal && (
         <div className="fixed inset-0 bg-black bg-opacity-75 flex items-start justify-center z-50 overflow-y-auto py-8">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-3xl w-full mx-4 my-8">
             <div className="p-6 border-b border-gray-200 bg-red-50">
               <h2 className="text-2xl font-bold text-red-900">Complete Your Profile Required</h2>
               <p className="text-red-700 mt-2">
                 You must complete all required profile information before accessing the application.
               </p>
             </div>
-            <div className="p-6">
+            <div className="p-6 max-h-[70vh] overflow-y-auto">
               <div className="bg-blue-50 border border-blue-200 p-4 rounded-md mb-6">
                 <h3 className="font-semibold text-blue-900 mb-2">What you need to provide:</h3>
                 <ul className="space-y-1 text-sm text-blue-800">
@@ -1181,36 +1181,178 @@ export default function AviationLogbook() {
                     <span className={addresses?.some(addr => addr.is_current) ? "text-green-600" : "text-red-600"}>
                       {addresses?.some(addr => addr.is_current) ? "✓" : "○"}
                     </span>
-                    Current Address (add in Address History section below)
+                    Current Address
                   </li>
                 </ul>
               </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Please scroll down to fill in your personal information and add your current address in the Address History section.
-              </p>
-              <div className="flex justify-end">
-                <button
-                  onClick={() => {
-                    const hasCurrentAddress = addresses?.some(addr => addr.is_current);
-                    const isComplete =
-                      profileFormData.title &&
-                      profileFormData.forename &&
-                      profileFormData.surname &&
-                      profileFormData.date_of_birth &&
-                      profileFormData.nationality &&
-                      hasCurrentAddress;
 
-                    if (isComplete) {
-                      setShowProfileCompletionModal(false);
-                    } else {
-                      setError('Please complete all required fields before continuing');
-                    }
-                  }}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition"
-                >
-                  I've Completed My Profile
-                </button>
+              {/* Personal Information Form */}
+              <div className="space-y-4 mb-6">
+                <h3 className="text-lg font-semibold text-gray-800">Personal Information</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Title <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={profileFormData.title || ''}
+                      onChange={(e) => setProfileFormData({...profileFormData, title: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      <option value="Mr">Mr</option>
+                      <option value="Mrs">Mrs</option>
+                      <option value="Ms">Ms</option>
+                      <option value="Miss">Miss</option>
+                      <option value="Dr">Dr</option>
+                      <option value="Prof">Prof</option>
+                      <option value="Rev">Rev</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Forename(s) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={profileFormData.forename || ''}
+                      onChange={(e) => setProfileFormData({...profileFormData, forename: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="John"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Surname <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={profileFormData.surname || ''}
+                      onChange={(e) => setProfileFormData({...profileFormData, surname: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="Smith"
+                      required
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Date of Birth <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="date"
+                      value={profileFormData.date_of_birth || ''}
+                      onChange={(e) => setProfileFormData({...profileFormData, date_of_birth: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Nationality <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={profileFormData.nationality || ''}
+                      onChange={(e) => setProfileFormData({...profileFormData, nationality: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      required
+                    >
+                      <option value="">Select...</option>
+                      <option value="British">British</option>
+                      <option value="Irish">Irish</option>
+                      <option value="American">American</option>
+                      <option value="Canadian">Canadian</option>
+                      <option value="Australian">Australian</option>
+                      <option value="New Zealand">New Zealand</option>
+                      <option value="French">French</option>
+                      <option value="German">German</option>
+                      <option value="Spanish">Spanish</option>
+                      <option value="Italian">Italian</option>
+                      <option value="Dutch">Dutch</option>
+                      <option value="Belgian">Belgian</option>
+                      <option value="Swiss">Swiss</option>
+                      <option value="Austrian">Austrian</option>
+                      <option value="Polish">Polish</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+                </div>
               </div>
+
+              {/* Address Section */}
+              <div className="border-t pt-6 mb-6">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-gray-800">Current Address <span className="text-red-500">*</span></h3>
+                  <button
+                    onClick={() => handleOpenAddressModal()}
+                    className="flex items-center gap-2 bg-blue-600 text-white px-3 py-1.5 rounded-md hover:bg-blue-700 transition text-sm"
+                  >
+                    <span>+</span>
+                    Add Address
+                  </button>
+                </div>
+                {addresses?.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 bg-gray-50 rounded-md border border-gray-200">
+                    <p>Please add your current address to continue</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {addresses?.map(address => (
+                      <div key={address.id} className={`border rounded-lg p-3 ${address.is_current ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
+                        <div className="flex justify-between items-start">
+                          <div className="flex-1">
+                            {address.is_current && (
+                              <span className="inline-block bg-green-100 text-green-700 text-xs px-2 py-1 rounded mb-1">
+                                Current Address
+                              </span>
+                            )}
+                            <p className="font-medium text-gray-800 text-sm">{address.address_line_1}</p>
+                            {address.address_line_2 && (
+                              <p className="text-gray-600 text-sm">{address.address_line_2}</p>
+                            )}
+                            <p className="text-gray-600 text-sm">{address.city}{address.county && `, ${address.county}`}</p>
+                            <p className="text-gray-600 text-sm">{address.postcode}</p>
+                          </div>
+                          <button
+                            onClick={() => handleOpenAddressModal(address)}
+                            className="text-blue-600 hover:bg-blue-50 px-2 py-1 rounded text-sm"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="p-6 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
+              <button
+                onClick={async () => {
+                  await handleUpdateProfile();
+                  // Check if profile is now complete
+                  const hasCurrentAddress = addresses?.some(addr => addr.is_current);
+                  const isComplete =
+                    profileFormData.title &&
+                    profileFormData.forename &&
+                    profileFormData.surname &&
+                    profileFormData.date_of_birth &&
+                    profileFormData.nationality &&
+                    hasCurrentAddress;
+
+                  if (isComplete) {
+                    setShowProfileCompletionModal(false);
+                  }
+                }}
+                disabled={loading}
+                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition disabled:opacity-50"
+              >
+                {loading ? 'Saving...' : 'Save & Continue'}
+              </button>
             </div>
           </div>
         </div>
